@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { LeagueOperator } from './league-operator.entity';
 import { LeagueParticipant } from './league-participant.entity';
 import { User } from './user.entity';
+import { Stage } from './stage.entity';
 import { SkillLevel } from '../common/enums/skill-level.enum';
 
 @Entity()
@@ -83,4 +84,7 @@ export class League {
 
   @OneToMany(() => LeagueParticipant, participant => participant.league)
   participants: LeagueParticipant[];
+
+  @OneToMany(() => Stage, stage => stage.league)
+  stages: Stage[];
 } 

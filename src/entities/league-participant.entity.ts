@@ -22,7 +22,7 @@ export class LeagueParticipant {
   league: League;
 
   @ApiProperty({ description: '사용자', type: () => User })
-  @ManyToOne(() => User, user => user.participatedLeagues, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.participatingLeagues, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 

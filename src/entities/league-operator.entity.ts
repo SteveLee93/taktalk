@@ -15,7 +15,7 @@ export class LeagueOperator {
   league: League;
 
   @ApiProperty({ description: '사용자', type: () => User })
-  @ManyToOne(() => User, user => user.operatedLeagues, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.operatingLeagues, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 } 

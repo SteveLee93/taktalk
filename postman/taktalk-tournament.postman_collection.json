@@ -1,0 +1,408 @@
+{
+	"info": {
+		"_postman_id": "1234567-89ab-cdef-0123-456789abcdef",
+		"name": "탁구 리그 테스트",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "0. 인증",
+			"item": [
+				{
+					"name": "0.1 운영자 로그인",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);",
+									"pm.collectionVariables.set(\"authToken\", jsonData.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"operator1\",\n  \"password\": \"operator1\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				},
+				{
+					"name": "0.2 일반 사용자 로그인",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);",
+									"pm.collectionVariables.set(\"authToken\", jsonData.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"username\": \"user1\",\n  \"password\": \"user1\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": ["{{baseUrl}}"],
+							"path": ["auth", "login"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "1. 리그 참가",
+			"item": [
+				{
+					"name": "1.1 리그 참가 신청",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"skillLevel\": \"DAN_1\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/leagues/1/participants",
+							"host": ["{{baseUrl}}"],
+							"path": ["leagues", "1", "participants"]
+						},
+						"description": "리그에 참가 신청을 합니다. skillLevel은 다음 중 하나여야 합니다:\nKYU_10, KYU_9, KYU_8, KYU_7, KYU_6, KYU_5, KYU_4, KYU_3, KYU_2, KYU_1,\nDAN_1, DAN_2, DAN_3, DAN_4, DAN_5, DAN_6, DAN_7, DAN_8, DAN_9, DAN_10"
+					}
+				},
+				{
+					"name": "1.2 리그 참가 신청 승인",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"APPROVED\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/leagues/1/participants/1/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["leagues", "1", "participants", "1", "status"]
+						},
+						"description": "리그 참가 신청을 승인합니다. status는 'APPROVED' 또는 'REJECTED'여야 합니다."
+					}
+				}
+			]
+		},
+		{
+			"name": "2. 예선 단계",
+			"item": [
+				{
+					"name": "2.1 예선 단계 생성",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"leagueId\": 1,\n  \"name\": \"예선\",\n  \"order\": 1,\n  \"type\": \"GROUP\",\n  \"options\": {\n    \"matchFormat\": {\n      \"gamesRequired\": 5,\n      \"setsRequired\": 3\n    },\n    \"groupCount\": 4,\n    \"playersPerGroup\": 4,\n    \"advancingPlayersCount\": 2\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/stages",
+							"host": ["{{baseUrl}}"],
+							"path": ["stages"]
+						}
+					}
+				},
+				{
+					"name": "2.2 예선 단계 조회",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/stages/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["stages", "1"]
+						}
+					}
+				},
+				{
+					"name": "2.3 예선 조 편성 확정",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"groups\": [\n    [1, 6, 11, 16],\n    [2, 7, 12, 13],\n    [3, 8, 9, 14],\n    [4, 5, 10, 15]\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/stages/1/confirm-groups",
+							"host": ["{{baseUrl}}"],
+							"path": ["stages", "1", "confirm-groups"]
+						}
+					}
+				},
+				{
+					"name": "2.4 예선 매치 목록 조회",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/matches/stage/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["matches", "stage", "1"]
+						}
+					}
+				},
+				{
+					"name": "2.5 예선 매치 결과 입력",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"scoreDetails\": [\n    {\n      \"player1Score\": 11,\n      \"player2Score\": 9\n    },\n    {\n      \"player1Score\": 11,\n      \"player2Score\": 8\n    },\n    {\n      \"player1Score\": 9,\n      \"player2Score\": 11\n    },\n    {\n      \"player1Score\": 11,\n      \"player2Score\": 7\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/matches/1/result",
+							"host": ["{{baseUrl}}"],
+							"path": ["matches", "1", "result"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. 본선 토너먼트",
+			"item": [
+				{
+					"name": "3.1 본선 토너먼트 생성",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"leagueId\": 1,\n  \"name\": \"본선 토너먼트\",\n  \"order\": 2,\n  \"type\": \"TOURNAMENT\",\n  \"options\": {\n    \"matchFormat\": {\n      \"gamesRequired\": 7,\n      \"setsRequired\": 4\n    },\n    \"bracketType\": \"UPPER\",\n    \"playerCount\": 8,\n    \"startRound\": 3,\n    \"seeding\": {\n      \"type\": \"GROUP_RANK\",\n      \"groupRankWeights\": [1.5, 1.0]\n    }\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/stages",
+							"host": ["{{baseUrl}}"],
+							"path": ["stages"]
+						}
+					}
+				},
+				{
+					"name": "3.2 본선 스테이지 조회",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/stages/2",
+							"host": ["{{baseUrl}}"],
+							"path": ["stages", "2"]
+						}
+					}
+				},
+				{
+					"name": "3.3 본선 매치 목록 조회",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/matches/stage/2",
+							"host": ["{{baseUrl}}"],
+							"path": ["matches", "stage", "2"]
+						}
+					}
+				},
+				{
+					"name": "3.4 본선 매치 결과 입력",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"scoreDetails\": [\n    {\n      \"player1Score\": 11,\n      \"player2Score\": 9\n    },\n    {\n      \"player1Score\": 11,\n      \"player2Score\": 7\n    },\n    {\n      \"player1Score\": 9,\n      \"player2Score\": 11\n    },\n    {\n      \"player1Score\": 11,\n      \"player2Score\": 13\n    },\n    {\n      \"player1Score\": 11,\n      \"player2Score\": 8\n    }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/matches/25/result",
+							"host": ["{{baseUrl}}"],
+							"path": ["matches", "25", "result"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. 공통 조회",
+			"item": [
+				{
+					"name": "4.1 리그 정보 조회",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/leagues/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["leagues", "1"]
+						}
+					}
+				},
+				{
+					"name": "4.2 리그 참가자 목록 조회",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/leagues/1/participants",
+							"host": ["{{baseUrl}}"],
+							"path": ["leagues", "1", "participants"]
+						}
+					}
+				},
+				{
+					"name": "4.3 특정 매치 정보 조회",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{authToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/matches/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["matches", "1"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "authToken",
+			"value": ""
+		},
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000"
+		}
+	]
+} 

@@ -13,5 +13,6 @@ import { LeagueParticipant } from '../../entities/league-participant.entity';
   ],
   controllers: [LeaguesController],
   providers: [LeaguesService],
+  exports: [LeaguesService, TypeOrmModule],
 })
 export class LeaguesModule {} 

@@ -2,6 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { LeagueOperator } from './league-operator.entity';
 import { LeagueParticipant } from './league-participant.entity';
+import { PlayerInGroup } from './player-in-group.entity';
+import { MatchResult } from './match-result.entity';
 import { Exclude } from 'class-transformer';
 
 @Entity()
@@ -32,8 +34,14 @@ export class User {
   phone: string;
 
   @OneToMany(() => LeagueOperator, operator => operator.user)
-  operatedLeagues: LeagueOperator[];
+  operatingLeagues: LeagueOperator[];
 
   @OneToMany(() => LeagueParticipant, participant => participant.user)
-  participatedLeagues: LeagueParticipant[];
+  participatingLeagues: LeagueParticipant[];
+
+  @OneToMany(() => PlayerInGroup, playerInGroup => playerInGroup.user)
+  groups: PlayerInGroup[];
+
+  @OneToMany(() => MatchResult, result => result.winner)
+  wonMatches: MatchResult[];
 } 

@@ -1,0 +1,35 @@
+import { Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Column } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
+import { User } from './user.entity';
+import { League } from './league.entity';
+
+export enum ParticipantStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected'
+}
+
+@Entity()
+export class LeagueParticipant {
+  @ApiProperty({ description: '참가자 ID' })
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @ApiProperty({ description: '리그', type: () => League })
+  @ManyToOne(() => League, league => league.participants, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'league_id' })
+  league: League;
+
+  @ApiProperty({ description: '사용자', type: () => User })
+  @ManyToOne(() => User, user => user.participatedLeagues, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
+  user: User;
+
+  @ApiProperty({ description: '참가 상태', enum: ParticipantStatus, default: ParticipantStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: ParticipantStatus,
+    default: ParticipantStatus.PENDING
+  })
+  status: ParticipantStatus;
+} 

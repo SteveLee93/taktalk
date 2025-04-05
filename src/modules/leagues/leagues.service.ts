@@ -1,12 +1,11 @@
-import { Injectable, NotFoundException, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { League } from '../../entities/league.entity';
 import { User } from '../../entities/user.entity';
 import { LeagueOperator } from '../../entities/league-operator.entity';
-import { LeagueParticipant } from '../../entities/league-participant.entity';
-import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto } from './dto/league.dto';
-import { ParticipantStatus } from '../../entities/league-participant.entity';
+import { LeagueParticipant, ParticipantStatus } from '../../entities/league-participant.entity';
+import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto, ParticipateLeagueDto, SearchLeagueDto } from './dto/league.dto';
 
 @Injectable()
 export class LeaguesService {
@@ -22,17 +21,17 @@ export class LeaguesService {
   ) {}
 
   async createLeague(createLeagueDto: CreateLeagueDto, userId: number): Promise<League> {
-    const league = this.leagueRepository.create(createLeagueDto);
-    const savedLeague = await this.leagueRepository.save(league);
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
 
-    // 리그 생성자를 운영자로 추가
-    const operator = this.operatorRepository.create({
-      league: savedLeague,
-      user: { id: userId },
+    const league = this.leagueRepository.create({
+      ...createLeagueDto,
+      creator: user,
     });
-    await this.operatorRepository.save(operator);
-
-    return savedLeague;
+    
+    return await this.leagueRepository.save(league);
   }
 
   async addOperator(leagueId: number, addOperatorDto: AddOperatorDto, userId: number): Promise<void> {
@@ -80,7 +79,7 @@ export class LeaguesService {
     await this.operatorRepository.save(operator);
   }
 
-  async participateLeague(leagueId: number, userId: number): Promise<void> {
+  async participateLeague(leagueId: number, userId: number, dto: ParticipateLeagueDto) {
     const league = await this.leagueRepository.findOne({
       where: { id: leagueId },
       relations: ['participants'],
@@ -90,7 +89,11 @@ export class LeaguesService {
       throw new NotFoundException('리그를 찾을 수 없습니다.');
     }
 
-    // 이미 참가 신청했는지 확인
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+    }
+
     const existingParticipant = await this.participantRepository.findOne({
       where: { league: { id: leagueId }, user: { id: userId } },
     });
@@ -99,21 +102,17 @@ export class LeaguesService {
       throw new ConflictException('이미 참가 신청한 리그입니다.');
     }
 
-    // 참가자 수 확인
-    const participantCount = await this.participantRepository.count({
-      where: { league: { id: leagueId }, status: ParticipantStatus.APPROVED },
-    });
-
-    if (participantCount >= league.maxPlayers) {
+    if (league.participants.length >= league.maxPlayers) {
       throw new ConflictException('최대 참가자 수를 초과했습니다.');
     }
 
-    // 참가 신청
     const participant = this.participantRepository.create({
       league,
-      user: { id: userId },
+      user,
       status: ParticipantStatus.PENDING,
+      skillLevel: dto.skillLevel,
     });
+
     await this.participantRepository.save(participant);
   }
 
@@ -148,7 +147,7 @@ export class LeaguesService {
   async getLeague(id: number): Promise<League> {
     const league = await this.leagueRepository.findOne({
       where: { id },
-      relations: ['operators', 'participants'],
+      relations: ['creator', 'operators', 'participants'],
     });
 
     if (!league) {
@@ -160,7 +159,29 @@ export class LeaguesService {
 
   async getLeagues(): Promise<League[]> {
     return this.leagueRepository.find({
-      relations: ['operators', 'participants'],
+      relations: ['creator', 'operators', 'participants'],
     });
+  }
+
+  async searchLeagues(searchDto: SearchLeagueDto): Promise<League[]> {
+    const queryBuilder = this.leagueRepository.createQueryBuilder('league')
+      .leftJoinAndSelect('league.creator', 'creator')
+      .leftJoinAndSelect('league.operators', 'operators')
+      .leftJoinAndSelect('league.participants', 'participants');
+
+    if (searchDto.city) {
+      queryBuilder.andWhere('league.city = :city', { city: searchDto.city });
+    }
+
+    if (searchDto.district) {
+      queryBuilder.andWhere('league.district = :district', { district: searchDto.district });
+    }
+
+    if (searchDto.skillLevel) {
+      queryBuilder.andWhere('league.minSkillLevel <= :skillLevel', { skillLevel: searchDto.skillLevel })
+        .andWhere('league.maxSkillLevel >= :skillLevel', { skillLevel: searchDto.skillLevel });
+    }
+
+    return queryBuilder.getMany();
   }
 } 

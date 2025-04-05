@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Column } from 't
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { League } from './league.entity';
+import { SkillLevel } from '../common/enums/skill-level.enum';
 
 export enum ParticipantStatus {
   PENDING = 'pending',
@@ -32,4 +33,11 @@ export class LeagueParticipant {
     default: ParticipantStatus.PENDING
   })
   status: ParticipantStatus;
+
+  @Column({
+    type: 'enum',
+    enum: SkillLevel,
+  })
+  @ApiProperty({ description: '참가자 부수', enum: SkillLevel })
+  skillLevel: SkillLevel;
 } 

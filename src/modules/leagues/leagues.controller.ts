@@ -1,8 +1,8 @@
-import { Controller, Post, Body, Param, UseGuards, Request, Put, Get } from '@nestjs/common';
+import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { LeaguesService } from './leagues.service';
-import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto } from './dto/league.dto';
+import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto, ParticipateLeagueDto, SearchLeagueDto } from './dto/league.dto';
 import { League } from '../../entities/league.entity';
 
 @ApiTags('리그')
@@ -43,8 +43,9 @@ export class LeaguesController {
   async participateLeague(
     @Param('id') id: number,
     @Request() req,
-  ): Promise<void> {
-    return this.leaguesService.participateLeague(id, req.user.id);
+    @Body() dto: ParticipateLeagueDto,
+  ) {
+    return this.leaguesService.participateLeague(id, req.user.id, dto);
   }
 
   @Put(':id/participants/:participantId')
@@ -84,5 +85,16 @@ export class LeaguesController {
   })
   async getLeagues(): Promise<League[]> {
     return this.leaguesService.getLeagues();
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: '리그 검색' })
+  @ApiResponse({
+    status: 200,
+    description: '검색 조건에 맞는 리그 목록',
+    type: [League],
+  })
+  async searchLeagues(@Query() searchDto: SearchLeagueDto): Promise<League[]> {
+    return this.leaguesService.searchLeagues(searchDto);
   }
 } 

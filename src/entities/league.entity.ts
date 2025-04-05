@@ -1,7 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { LeagueOperator } from './league-operator.entity';
 import { LeagueParticipant } from './league-participant.entity';
+import { User } from './user.entity';
+import { SkillLevel } from '../common/enums/skill-level.enum';
 
 @Entity()
 export class League {
@@ -9,13 +11,26 @@ export class League {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @ApiProperty({ description: '리그 생성자', type: () => User })
+  @ManyToOne(() => User, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'creator_id' })
+  creator: User;
+
+  @ApiProperty({ description: '생성 일시' })
+  @CreateDateColumn()
+  createdAt: Date;
+
   @ApiProperty({ description: '리그 이름' })
   @Column()
   name: string;
 
-  @ApiProperty({ description: '리그 장소' })
+  @ApiProperty({ description: '시/도' })
   @Column()
-  location: string;
+  city: string;
+
+  @ApiProperty({ description: '구/군' })
+  @Column()
+  district: string;
 
   @ApiProperty({ description: '경기장' })
   @Column()
@@ -37,9 +52,19 @@ export class League {
   @Column('text')
   description: string;
 
-  @ApiProperty({ description: '실력 수준' })
-  @Column()
-  skillLevel: string;
+  @ApiProperty({ description: '최소 실력 수준', enum: SkillLevel })
+  @Column({
+    type: 'enum',
+    enum: SkillLevel,
+  })
+  minSkillLevel: SkillLevel;
+
+  @ApiProperty({ description: '최대 실력 수준', enum: SkillLevel })
+  @Column({
+    type: 'enum',
+    enum: SkillLevel,
+  })
+  maxSkillLevel: SkillLevel;
 
   @ApiProperty({ description: '최대 참가자 수' })
   @Column()

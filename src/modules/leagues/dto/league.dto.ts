@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNumber, IsArray, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
 import { ParticipantStatus } from '../../../entities/league-participant.entity';
+import { SkillLevel } from '../../../common/enums/skill-level.enum';
 
 export class CreateLeagueDto {
   @ApiProperty({ description: '리그 이름' })
@@ -8,10 +9,15 @@ export class CreateLeagueDto {
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: '리그 장소' })
+  @ApiProperty({ description: '시/도' })
   @IsString()
   @IsNotEmpty()
-  location: string;
+  city: string;
+
+  @ApiProperty({ description: '구/군' })
+  @IsString()
+  @IsNotEmpty()
+  district: string;
 
   @ApiProperty({ description: '경기장' })
   @IsString()
@@ -36,10 +42,23 @@ export class CreateLeagueDto {
   @IsString()
   description: string;
 
-  @ApiProperty({ description: '실력 수준' })
-  @IsString()
+  @ApiProperty({ 
+    description: '최소 실력 수준',
+    enum: SkillLevel,
+    example: SkillLevel.FIVE
+  })
+  @IsEnum(SkillLevel)
   @IsNotEmpty()
-  skillLevel: string;
+  minSkillLevel: SkillLevel;
+
+  @ApiProperty({ 
+    description: '최대 실력 수준',
+    enum: SkillLevel,
+    example: SkillLevel.ZERO
+  })
+  @IsEnum(SkillLevel)
+  @IsNotEmpty()
+  maxSkillLevel: SkillLevel;
 
   @ApiProperty({ description: '최대 참가자 수' })
   @IsNumber()
@@ -63,9 +82,44 @@ export class AddOperatorDto {
   nickname: string;
 }
 
+export class ParticipateLeagueDto {
+  @IsEnum(SkillLevel)
+  @ApiProperty({
+    description: '참가자 부수',
+    enum: SkillLevel,
+    example: SkillLevel.FIVE
+  })
+  skillLevel: SkillLevel;
+}
+
 export class UpdateParticipantStatusDto {
-  @ApiProperty({ description: '참가 상태', enum: ParticipantStatus })
   @IsEnum(ParticipantStatus)
-  @IsNotEmpty()
+  @ApiProperty({
+    description: '참가 상태',
+    enum: ParticipantStatus,
+    example: ParticipantStatus.APPROVED
+  })
   status: ParticipantStatus;
+}
+
+export class SearchLeagueDto {
+  @ApiProperty({ description: '시/도', required: false })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
+  @ApiProperty({ description: '구/군', required: false })
+  @IsString()
+  @IsOptional()
+  district?: string;
+
+  @ApiProperty({ 
+    description: '실력 수준',
+    enum: SkillLevel,
+    required: false,
+    example: SkillLevel.FIVE
+  })
+  @IsEnum(SkillLevel)
+  @IsOptional()
+  skillLevel?: SkillLevel;
 } 

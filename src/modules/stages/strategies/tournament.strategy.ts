@@ -690,50 +690,23 @@ export class TournamentStageStrategy implements StageStrategy {
   }
 
   private async getPreviousStage(stage: Stage): Promise<Stage | null> {
-    console.log(`현재 스테이지 ID: ${stage.id}, 순서: ${stage.order}, 리그: ${stage.league.id}`);
-    
-    // 토너먼트 타입인 경우 예선(GROUP) 스테이지를 찾도록 수정
+    // 토너먼트 타입이면 예선(GROUP) 스테이지를 찾음
     if (stage.type === StageType.TOURNAMENT) {
-      const preliminaryStage = await this.stageRepository.findOne({
+      return await this.stageRepository.findOne({
         where: {
           league: { id: stage.league.id },
           type: StageType.GROUP
         },
-        order: { order: 'ASC' }
       });
-      
-      if (preliminaryStage) {
-        console.log(`예선 스테이지 찾음: ID ${preliminaryStage.id}, 이름: ${preliminaryStage.name}`);
-        return preliminaryStage;
-      }
     }
     
-    // 기존 로직 (순서로 찾기)
-    const previousStage = await this.stageRepository.findOne({
+    // 기존 로직 (order 기반)
+    return await this.stageRepository.findOne({
       where: {
         league: { id: stage.league.id },
         order: stage.order - 1,
       },
     });
-    
-    if (previousStage) {
-      console.log(`이전 스테이지 찾음: ID ${previousStage.id}, 이름: ${previousStage.name}`);
-    } else {
-      console.error(`이전 스테이지 찾지 못함! (스테이지 ${stage.id}, 순서 ${stage.order})`);
-      
-      // 모든 스테이지 로깅
-      const allStages = await this.stageRepository.find({
-        where: { league: { id: stage.league.id } },
-        order: { order: 'ASC' },
-      });
-      
-      console.log('현재 리그의 모든 스테이지:');
-      allStages.forEach(s => {
-        console.log(`ID: ${s.id}, 이름: ${s.name}, 순서: ${s.order}, 타입: ${s.type}`);
-      });
-    }
-    
-    return previousStage;
   }
 
   async getAdvancingPlayers(stage: Stage): Promise<User[]> {

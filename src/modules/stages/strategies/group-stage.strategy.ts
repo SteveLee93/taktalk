@@ -11,6 +11,7 @@ import { MatchStatus } from '../../../entities/match.entity';
 import { GroupStageOptions } from '../../../common/types/stage-options.type';
 import { MatchResult } from '../../../entities/match-result.entity';
 import { SetScoreDto } from '../dto/match.dto';
+import { EntityManager } from 'typeorm';
 
 @Injectable()
 export class GroupStageStrategy implements StageStrategy {
@@ -49,12 +50,15 @@ export class GroupStageStrategy implements StageStrategy {
       );
 
       // 플레이어를 그룹에 추가
-      for (const player of groupPlayers) {
+      for (let j = 0; j < groupPlayers.length; j++) {
+        const player = groupPlayers[j];
         const playerInGroup = this.playerInGroupRepository.create({
           group,
           user: player,
+          rank: j + 1, // 초기 순위 설정 (1부터 시작)
         });
         await this.playerInGroupRepository.save(playerInGroup);
+        console.log(`그룹 ${groupNumber}에 ${player.nickname}(${player.id}) 추가, 초기 순위: ${j + 1}`);
       }
     }
   }
@@ -294,6 +298,69 @@ export class GroupStageStrategy implements StageStrategy {
       await transactionalEntityManager
         .getRepository(Match)
         .save(match);
+        
+      // 그룹 내 플레이어 순위 재계산
+      if (match.groupNumber) {
+        await this.recalculateGroupRanks(match.stage.id, match.groupNumber, transactionalEntityManager);
+      }
     });
+  }
+  
+  // 그룹 내 플레이어 순위 재계산
+  private async recalculateGroupRanks(
+    stageId: number, 
+    groupNumber: number, 
+    entityManager?: EntityManager
+  ): Promise<void> {
+    const repo = entityManager ? entityManager.getRepository(Group) : this.groupRepository;
+    
+    // 그룹 정보 로드
+    const group = await repo.findOne({
+      where: { stage: { id: stageId }, number: groupNumber },
+      relations: ['players', 'players.user']
+    });
+    
+    if (!group) {
+      console.error(`그룹을 찾을 수 없음: 스테이지 ${stageId}, 그룹 ${groupNumber}`);
+      return;
+    }
+    
+    // 그룹의 모든 매치 가져오기
+    const matchRepo = entityManager ? entityManager.getRepository(Match) : this.matchRepository;
+    const matches = await matchRepo.find({
+      where: { stage: { id: stageId }, groupNumber },
+      relations: ['result', 'result.winner', 'player1', 'player2']
+    });
+    
+    // 승리 수 계산
+    const playerWins = new Map<number, number>();
+    group.players.forEach(p => playerWins.set(p.user.id, 0));
+    
+    matches.forEach(match => {
+      if (match.result?.winner) {
+        const currentWins = playerWins.get(match.result.winner.id) || 0;
+        playerWins.set(match.result.winner.id, currentWins + 1);
+      }
+    });
+    
+    // 승리 수로 플레이어 정렬
+    const sortedPlayers = [...group.players]
+      .sort((a, b) => {
+        const winsA = playerWins.get(a.user.id) || 0;
+        const winsB = playerWins.get(b.user.id) || 0;
+        return winsB - winsA; // 승리 많은 순
+      });
+    
+    // 순위 업데이트
+    const playerInGroupRepo = entityManager 
+      ? entityManager.getRepository(PlayerInGroup) 
+      : this.playerInGroupRepository;
+      
+    for (let i = 0; i < sortedPlayers.length; i++) {
+      const player = sortedPlayers[i];
+      player.rank = i + 1;
+      await playerInGroupRepo.save(player);
+      console.log(`플레이어 ${player.user.nickname}의 순위 업데이트: ${i+1}등`);
+    }
   }
 } 

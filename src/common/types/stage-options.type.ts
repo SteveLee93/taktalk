@@ -1,3 +1,8 @@
+export enum StageType {
+  GROUP = 'GROUP',
+  TOURNAMENT = 'TOURNAMENT'
+}
+
 export interface BaseStageOptions {
   matchFormat: {
     gamesRequired: number;  // 전체 판 수 (예: 5판)
@@ -14,13 +19,18 @@ export interface GroupStageOptions extends BaseStageOptions {
 export type BracketType = 'UPPER' | 'LOWER';
 export type SeedingType = 'GROUP_RANK' | 'MANUAL';
 
-export interface TournamentOptions extends BaseStageOptions {
-  bracketType: BracketType;          // 상위부/하위부 구분
-  playerCount: number;               // 참가자 수
-  startRound: number;               // 시작 라운드 (8강 = 3, 16강 = 4, 32강 = 5)
+export interface TournamentOptions {
+  matchFormat: {
+    gamesRequired: number;
+    setsRequired: number;
+  };
+  bracketType: BracketType;
   seeding: {
-    type: SeedingType;              // 시드 배정 방식
-    groupRankWeights?: number[];    // 조별 순위별 가중치 (GROUP_RANK 타입일 때만 사용)
-    manualSeeds?: number[];        // 수동 시드 배정 (MANUAL 타입일 때만 사용)
+    type: SeedingType;
+    qualificationCriteria: {
+      rankCutoff: number;  // 각 조별 상위 N위까지 진출
+      minRank?: number;    // 최소 랭크 (기본값: 1)
+      maxRank?: number;    // 최대 랭크 (기본값: rankCutoff)
+    };
   };
 } 

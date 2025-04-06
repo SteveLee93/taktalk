@@ -6,7 +6,9 @@ import { TournamentStageStrategy } from './strategies/tournament.strategy';
 import { GroupStageStrategy } from './strategies/group-stage.strategy';
 import { Stage } from '../../entities/stage.entity';
 import { UpdateMatchResultDto } from './dto/match.dto';
-import { StageType } from '../../common/enums/stage-type.enum';
+import { StageType } from '../../common/types/stage-options.type';
+import { MatchResult } from '../../entities/match-result.entity';
+import { User } from '../../entities/user.entity';
 
 @Injectable()
 export class MatchService {
@@ -17,6 +19,10 @@ export class MatchService {
     private readonly stageRepository: Repository<Stage>,
     private readonly tournamentStrategy: TournamentStageStrategy,
     private readonly groupStageStrategy: GroupStageStrategy,
+    @InjectRepository(MatchResult)
+    private readonly matchResultRepository: Repository<MatchResult>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   async getMatchesByStage(stageId: number): Promise<Match[]> {
@@ -93,5 +99,34 @@ export class MatchService {
     }
 
     return this.getMatch(id);
+  }
+
+  async resetNextMatch(stageId: number): Promise<void> {
+    // 직접 SQL을 사용하여 next_match_id를 null로 설정
+    const query = `
+      UPDATE match 
+      SET next_match_id = NULL 
+      WHERE stage_id = ?
+    `;
+    
+    await this.matchRepository.query(query, [stageId]);
+  }
+
+  async findMatchesByStageId(stageId: number): Promise<Match[]> {
+    return this.matchRepository.find({
+      where: { stage: { id: stageId } },
+      relations: {
+        stage: true,
+        group: true,
+        player1: true,
+        player2: true,
+        result: true,
+      },
+      order: {
+        stage: { order: 'ASC' },
+        group: { number: 'ASC' },
+        order: 'ASC',
+      }
+    });
   }
 } 

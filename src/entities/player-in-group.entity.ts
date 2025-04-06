@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Column } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Group } from './group.entity';
 import { User } from './user.entity';
@@ -18,4 +18,8 @@ export class PlayerInGroup {
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+  
+  @ApiProperty({ description: '그룹 내 순위', example: 1 })
+  @Column({ default: 0 })
+  rank: number;
 } 

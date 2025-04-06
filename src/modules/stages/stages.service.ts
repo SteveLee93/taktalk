@@ -6,7 +6,7 @@ import { Match } from '../../entities/match.entity';
 import { MatchResult } from '../../entities/match-result.entity';
 import { League } from '../../entities/league.entity';
 import { User } from '../../entities/user.entity';
-import { StageType } from '../../common/enums/stage-type.enum';
+import { StageType } from '../../common/types/stage-options.type';
 import { CreateStageDto, UpdateMatchResultDto } from './dto/stage.dto';
 import { GroupStageStrategy } from './strategies/group-stage.strategy';
 import { TournamentStageStrategy } from './strategies/tournament.strategy';
@@ -18,6 +18,7 @@ import { ConfirmGroupsDto } from './dto/confirm-groups.dto';
 import { BaseStageOptions, GroupStageOptions, TournamentOptions } from '../../common/types/stage-options.type';
 import { UpdateStageDto } from './dto/update-stage.dto';
 import { MatchService } from './match.service';
+import { ParticipantStatus } from '../../entities/league-participant.entity';
 
 @Injectable()
 export class StagesService {
@@ -48,46 +49,53 @@ export class StagesService {
     ]);
   }
 
+  private getStageStrategy(type: 'GROUP' | 'TOURNAMENT'): StageStrategy {
+    switch (type) {
+      case 'GROUP':
+        return this.groupStageStrategy;
+      case 'TOURNAMENT':
+        return this.tournamentStageStrategy;
+      default:
+        throw new BadRequestException('지원하지 않는 단계 타입입니다.');
+    }
+  }
+
   async createStage(createStageDto: CreateStageDto): Promise<Stage> {
+    const { leagueId, ...stageData } = createStageDto;
+    
+    // 리그 찾기
     const league = await this.leagueRepository.findOne({
-      where: { id: createStageDto.leagueId },
+      where: { id: leagueId },
       relations: ['participants', 'participants.user'],
     });
-
     if (!league) {
-      throw new NotFoundException('리그를 찾을 수 없습니다.');
+      throw new NotFoundException(`League with ID ${leagueId} not found`);
     }
 
-    // 동일한 순서의 단계가 있는지 확인
-    const existingStage = await this.stageRepository.findOne({
-      where: { league: { id: league.id }, order: createStageDto.order },
-    });
-
-    if (existingStage) {
-      throw new BadRequestException('해당 순서의 단계가 이미 존재합니다.');
-    }
-
+    // 스테이지 생성
     const stage = this.stageRepository.create({
-      ...createStageDto,
+      ...stageData,
       league,
     });
+    await this.stageRepository.save(stage);
 
-    const savedStage = await this.stageRepository.save(stage);
+    // 스테이지 전략 가져오기
+    const strategy = this.getStageStrategy(stage.type);
 
-    // 전략 패턴을 사용하여 단계별 로직 실행
-    const strategy = this.strategies.get(createStageDto.type);
-    if (!strategy) {
-      throw new BadRequestException('지원하지 않는 단계 타입입니다.');
+    // 토너먼트인 경우 매치 생성 후 시드 배정
+    if (stage.type === 'TOURNAMENT') {
+      await strategy.createMatches(stage);
+      await (strategy as TournamentStageStrategy).assignSeeds(stage);
+    } else {
+      // 그룹 스테이지인 경우 기존 로직 수행
+      const players = league.participants
+        .filter(p => p.status === ParticipantStatus.APPROVED)
+        .map(p => p.user);
+      await strategy.createGroups(stage, players);
+      await strategy.createMatches(stage);
     }
 
-    const players = league.participants
-      .filter(p => p.status === 'approved')
-      .map(p => p.user);
-
-    await strategy.createGroups(savedStage, players);
-    await strategy.createMatches(savedStage);
-
-    return savedStage;
+    return stage;
   }
 
   async getStage(id: number): Promise<Stage> {
@@ -164,48 +172,45 @@ export class StagesService {
     matchId: number,
     updateMatchResultDto: UpdateMatchResultDto,
   ): Promise<void> {
-    // 트랜잭션 시작
+    // 먼저 매치 조회 (트랜잭션 밖에서)
+    const match = await this.matchRepository.findOne({
+      where: { id: matchId },
+      relations: ['stage', 'player1', 'player2', 'result', 'nextMatch'],
+    });
+  
+    if (!match) {
+      throw new NotFoundException('경기를 찾을 수 없습니다.');
+    }
+  
+    if (!match.player1 || !match.player2) {
+      throw new BadRequestException('매치에 두 플레이어가 모두 설정되어 있어야 합니다.');
+    }
+  
+    // 세트 스코어 계산 (트랜잭션 밖에서)
+    const player1Sets = updateMatchResultDto.scoreDetails.filter(
+      set => set.player1Score > set.player2Score
+    ).length;
+    const player2Sets = updateMatchResultDto.scoreDetails.filter(
+      set => set.player2Score > set.player1Score
+    ).length;
+  
+    // 승자 결정
+    const winner = player1Sets > player2Sets ? match.player1 : match.player2;
+  
+    // 결과 저장 트랜잭션 - 간결하게 유지
     await this.matchRepository.manager.transaction(async transactionalEntityManager => {
-      // 기존 매치와 결과를 함께 조회
-      const match = await transactionalEntityManager
-        .getRepository(Match)
-        .findOne({
-          where: { id: matchId },
-          relations: ['stage', 'player1', 'player2', 'result'],
-        });
-
-      if (!match) {
-        throw new NotFoundException('경기를 찾을 수 없습니다.');
-      }
-
-      if (!match.player1 || !match.player2) {
-        throw new BadRequestException('매치에 두 플레이어가 모두 설정되어 있어야 합니다.');
-      }
-
-      // 세트 스코어 계산
-      const player1Sets = updateMatchResultDto.scoreDetails.filter(
-        set => set.player1Score > set.player2Score
-      ).length;
-      const player2Sets = updateMatchResultDto.scoreDetails.filter(
-        set => set.player2Score > set.player1Score
-      ).length;
-
-      // 승자 결정
-      const winner = player1Sets > player2Sets ? match.player1 : match.player2;
-
       // 기존 결과가 있으면 삭제
       if (match.result) {
         await transactionalEntityManager
           .getRepository(MatchResult)
           .delete(match.result.id);
         
-        // 매치의 result 관계도 제거
-        match.result = null as any;  // null 대신 undefined 사용
+        match.result = null as any;
         await transactionalEntityManager
           .getRepository(Match)
           .save(match);
       }
-
+  
       // 새로운 결과 생성
       const matchResultRepo = transactionalEntityManager.getRepository(MatchResult);
       const result = new MatchResult();
@@ -222,46 +227,33 @@ export class StagesService {
           player2Sets,
         }
       };
-
+  
       // result 저장
       const savedResult = await matchResultRepo.save(result);
-
+  
       // match 업데이트
       match.status = MatchStatus.COMPLETED;
       match.result = savedResult;
       await transactionalEntityManager
         .getRepository(Match)
         .save(match);
-
-      // 토너먼트의 경우 다음 라운드 매치 업데이트
-      if (match.stage.type === StageType.TOURNAMENT) {
-        const nextMatch = await this.findNextTournamentMatch(match);
-        if (nextMatch) {
-          if (!nextMatch.player1) {
-            nextMatch.player1 = winner;
-          } else if (!nextMatch.player2) {
-            nextMatch.player2 = winner;
-          }
-          await transactionalEntityManager
-            .getRepository(Match)
-            .save(nextMatch);
-        }
+    });
+  
+    // 트랜잭션 완료 후 별도로 처리
+    try {
+      // 스테이지 타입에 따른 추가 처리
+      if (match.stage.type === StageType.GROUP) {
+        // 그룹 스테이지 전략에 매치 결과 업데이트 위임
+        await this.groupStageStrategy.updateMatchResult(match, updateMatchResultDto.scoreDetails);
+      } else {
+        // 토너먼트 스테이지 전략에 매치 결과 업데이트 위임
+        await this.tournamentStageStrategy.updateMatchResult(match, winner.id);
       }
-    });
+    } catch (error) {
+      // 오류가 발생해도 주요 결과는 이미 저장되었으므로 로그만 남김
+      console.error('추가 처리 중 오류:', error);
+    }
   }
-
-  private async findNextTournamentMatch(currentMatch: Match): Promise<Match | null> {
-    const matches = await this.matchRepository.find({
-      where: { stage: { id: currentMatch.stage.id } },
-      order: { id: 'ASC' },
-    });
-
-    const currentMatchIndex = matches.findIndex(m => m.id === currentMatch.id);
-    const nextMatchIndex = Math.floor(currentMatchIndex / 2) + Math.floor(matches.length / 2);
-
-    return nextMatchIndex < matches.length ? matches[nextMatchIndex] : null;
-  }
-
   async confirmGroups(id: number, confirmGroupsDto: ConfirmGroupsDto): Promise<Stage> {
     const stage = await this.stageRepository.findOne({
       where: { id },
@@ -343,5 +335,20 @@ export class StagesService {
     }
 
     return updatedStage;
+  }
+
+  async removeStage(id: number): Promise<void> {
+    const stage = await this.getStage(id);
+    
+    // 스테이지의 모든 매치의 next_match_id를 null로 설정
+    const query = `
+      UPDATE match 
+      SET next_match_id = NULL 
+      WHERE stage_id = ?
+    `;
+    await this.matchRepository.query(query, [id]);
+    
+    // 이제 스테이지 삭제
+    await this.stageRepository.remove(stage);
   }
 } 

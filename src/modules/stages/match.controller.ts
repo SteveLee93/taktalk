@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Put, Body } from '@nestjs/common';
+import { Controller, Get, Param, Put, Body, Post } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Match } from '../../entities/match.entity';
 import { MatchService } from '../stages/match.service';
@@ -39,6 +39,12 @@ export class MatchController {
     await this.stagesService.updateMatchResult(id, updateMatchResultDto);
     const match = await this.matchService.getMatch(id);
     return this.toMatchResponse(match);
+  }
+
+  @Post('reset-next-match/:stageId')
+  @ApiOperation({ summary: '스테이지의 모든 매치의 next_match_id를 null로 설정' })
+  async resetNextMatch(@Param('stageId') stageId: number): Promise<void> {
+    return this.matchService.resetNextMatch(stageId);
   }
 
   private toMatchResponse(match: Match): MatchResponseDto {

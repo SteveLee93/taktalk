@@ -17,7 +17,7 @@ export interface PlayerOrigin {
   groupId?: number;
   groupName?: string;
   rank?: number;
-  seed?: number;
+  seed?: string;
 }
 
 @Entity()

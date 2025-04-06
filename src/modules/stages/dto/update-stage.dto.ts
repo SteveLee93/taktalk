@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNumber, IsEnum, ValidateNested, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { StageType } from '../../../common/enums/stage-type.enum';
+import { StageType } from '../../../common/types/stage-options.type';
 import { GroupStageOptions, TournamentOptions } from '../../../common/types/stage-options.type';
 
 export class UpdateStageDto {

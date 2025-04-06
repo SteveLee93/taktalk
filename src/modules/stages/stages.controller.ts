@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Param, Put, ParseIntPipe, Get } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Param, Put, ParseIntPipe, Get, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { StagesService } from './stages.service';
@@ -184,5 +184,11 @@ export class StagesController {
     @Body() confirmGroupsDto: ConfirmGroupsDto,
   ): Promise<Stage> {
     return this.stagesService.confirmGroups(id, confirmGroupsDto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: '스테이지 삭제' })
+  async removeStage(@Param('id') id: number): Promise<void> {
+    return this.stagesService.removeStage(id);
   }
 } 

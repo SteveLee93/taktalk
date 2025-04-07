@@ -78,4 +78,12 @@ export class AuthService {
     }
     return user;
   }
+
+  async getProfile(userId: number): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
+    }
+    return user;
+  }
 } 

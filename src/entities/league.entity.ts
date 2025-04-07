@@ -37,9 +37,9 @@ export class League {
   @Column()
   venue: string;
 
-  @ApiProperty({ description: '경기 시간' })
-  @Column()
-  time: string;
+  @ApiProperty({ description: '시작 시간' })
+  @Column({ type: 'timestamp' })
+  time: Date;
 
   @ApiProperty({ description: '테이블 수' })
   @Column()

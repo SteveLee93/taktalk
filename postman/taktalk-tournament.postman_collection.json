@@ -77,6 +77,44 @@
 			]
 		},
 		{
+			"name": "0.0 리그 생성",
+			"request": {
+			  "method": "POST",
+			  "header": [
+				{
+				  "key": "Content-Type",
+				  "value": "application/json"
+				},
+				{
+				  "key": "Authorization",
+				  "value": "Bearer {{authToken}}"
+				}
+			  ],
+			  "body": {
+				"mode": "raw",
+				"raw": "{\n  \"name\": \"2023 여름 탁구리그\",\n  \"city\": \"서울\",\n  \"district\": \"강남구\",\n  \"venue\": \"강남스포츠센터\",\n  \"time\": \"매주 토요일 오후 2시\",\n  \"tableCount\": 4,\n  \"prize\": \"1등 30만원, 2등 20만원\",\n  \"description\": \"강남구 탁구 동호회 여름 정기 리그전입니다.\",\n  \"minSkillLevel\": \"KYU_5\",\n  \"maxSkillLevel\": \"DAN_3\",\n  \"maxPlayers\": 16,\n  \"contact\": \"010-1234-5678\",\n  \"hashtags\": [\"강남구\", \"탁구리그\", \"아마추어\"]\n}"
+			  },
+			  "url": {
+				"raw": "{{baseUrl}}/leagues",
+				"host": ["{{baseUrl}}"],
+				"path": ["leagues"]
+			  }
+			},
+			"event": [
+			  {
+				"listen": "test",
+				"script": {
+				  "exec": [
+					"var jsonData = JSON.parse(responseBody);",
+					"pm.collectionVariables.set(\"leagueId\", jsonData.id);",
+					"console.log('새 리그 ID:', jsonData.id);"
+				  ],
+				  "type": "text/javascript"
+				}
+			  }
+			]
+		},
+		{
 			"name": "1. 리그 참가",
 			"item": [
 				{

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNumber, IsArray, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsArray, IsNotEmpty, IsOptional, IsEnum, IsDateString } from 'class-validator';
 import { ParticipantStatus } from '../../../entities/league-participant.entity';
 import { SkillLevel } from '../../../common/enums/skill-level.enum';
 
@@ -24,8 +24,8 @@ export class CreateLeagueDto {
   @IsNotEmpty()
   venue: string;
 
-  @ApiProperty({ description: '경기 시간' })
-  @IsString()
+  @ApiProperty({ description: '시작 시간', example: '2023-07-15T14:00:00Z' })
+  @IsDateString()
   @IsNotEmpty()
   time: string;
 

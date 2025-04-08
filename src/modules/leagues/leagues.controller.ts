@@ -1,8 +1,9 @@
-import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query, Delete } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { LeaguesService } from './leagues.service';
 import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto, ParticipateLeagueDto, SearchLeagueDto } from './dto/league.dto';
+import { CreateLeagueTemplateDto, LeagueTemplateDto } from './dto/league-template.dto';
 import { League } from '../../entities/league.entity';
 
 @ApiTags('리그')
@@ -67,6 +68,7 @@ export class LeaguesController {
       req.user.id,
     );
   }
+
   @Get('search')
   @ApiOperation({ summary: '리그 검색' })
   @ApiResponse({
@@ -77,6 +79,44 @@ export class LeaguesController {
   async searchLeagues(@Query() searchDto: SearchLeagueDto): Promise<League[]> {
     return this.leaguesService.searchLeagues(searchDto);
   }
+
+  // 템플릿 관련 API
+  @Get('templates')
+  @ApiOperation({ summary: '템플릿 목록 조회' })
+  @ApiQuery({ name: 'userId', required: true, description: '조회할 사용자 ID' })
+  @UseGuards(JwtAuthGuard)
+  async getTemplates(
+    @Query('userId') userId: string
+  ): Promise<LeagueTemplateDto[]> {
+    return this.leaguesService.findTemplatesByUserId(parseInt(userId));
+  }
+
+  @Post('templates')
+  @ApiOperation({ summary: '템플릿 저장' })
+  @ApiQuery({ name: 'userId', required: false, description: '템플릿을 저장할 사용자 ID (쿼리 파라미터)' })
+  @UseGuards(JwtAuthGuard)
+  async createTemplate(
+    @Body() createTemplateDto: CreateLeagueTemplateDto,
+    @Query('userId') queryUserId: string,
+    @Request() req
+  ): Promise<LeagueTemplateDto> {
+    // 요청 본문의 userId가 있으면 사용, 없으면 쿼리 파라미터, 없으면 현재 로그인한 사용자 ID 사용
+    const userId = createTemplateDto.userId || (queryUserId ? parseInt(queryUserId) : req.user.id);
+    console.log('템플릿 저장 요청:', { templateName: createTemplateDto.name, userId });
+    return this.leaguesService.createTemplate(createTemplateDto, userId);
+  }
+
+  @Delete('templates/:id')
+  @ApiOperation({ summary: '템플릿 삭제' })
+  @ApiQuery({ name: 'userId', required: true, description: '템플릿 소유자 ID' })
+  @UseGuards(JwtAuthGuard)
+  async deleteTemplate(
+    @Param('id') id: string,
+    @Query('userId') userId: string
+  ): Promise<void> {
+    return this.leaguesService.deleteTemplate(parseInt(id), parseInt(userId));
+  }
+
   @Get(':id')
   @ApiOperation({ summary: '리그 상세 정보 조회' })
   @ApiResponse({ 
@@ -98,6 +138,4 @@ export class LeaguesController {
   async getLeagues(): Promise<League[]> {
     return this.leaguesService.getLeagues();
   }
-
-  
 } 

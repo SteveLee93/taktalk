@@ -13,6 +13,7 @@ import { Group } from './entities/group.entity';
 import { PlayerInGroup } from './entities/player-in-group.entity';
 import { Match } from './entities/match.entity';
 import { MatchResult } from './entities/match-result.entity';
+import { LeagueTemplate } from './entities/league-template.entity';
 
 @Module({
   imports: [
@@ -37,7 +38,8 @@ import { MatchResult } from './entities/match-result.entity';
           Group,
           PlayerInGroup,
           Match,
-          MatchResult
+          MatchResult,
+          LeagueTemplate
         ],
         synchronize: true, // 개발 환경에서만 사용하세요
       }),

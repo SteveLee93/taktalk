@@ -5,7 +5,9 @@ import { League } from '../../entities/league.entity';
 import { User } from '../../entities/user.entity';
 import { LeagueOperator } from '../../entities/league-operator.entity';
 import { LeagueParticipant, ParticipantStatus } from '../../entities/league-participant.entity';
+import { LeagueTemplate } from '../../entities/league-template.entity';
 import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto, ParticipateLeagueDto, SearchLeagueDto } from './dto/league.dto';
+import { CreateLeagueTemplateDto, LeagueTemplateDto } from './dto/league-template.dto';
 
 @Injectable()
 export class LeaguesService {
@@ -18,6 +20,8 @@ export class LeaguesService {
     private operatorRepository: Repository<LeagueOperator>,
     @InjectRepository(LeagueParticipant)
     private participantRepository: Repository<LeagueParticipant>,
+    @InjectRepository(LeagueTemplate)
+    private leagueTemplateRepository: Repository<LeagueTemplate>,
   ) {}
 
   async createLeague(createLeagueDto: CreateLeagueDto, userId: number): Promise<League> {
@@ -183,5 +187,56 @@ export class LeaguesService {
     }
 
     return queryBuilder.getMany();
+  }
+
+  // 템플릿 관련 메서드
+  async findTemplatesByUserId(userId: number): Promise<LeagueTemplateDto[]> {
+    const templates = await this.leagueTemplateRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
+
+    return templates.map(template => ({
+      id: template.id,
+      name: template.name,
+      data: template.data,
+      createdAt: template.createdAt,
+    }));
+  }
+
+  async createTemplate(
+    createTemplateDto: CreateLeagueTemplateDto,
+    userId: number,
+  ): Promise<LeagueTemplateDto> {
+    const template = this.leagueTemplateRepository.create({
+      name: createTemplateDto.name,
+      data: createTemplateDto.data,
+      userId,
+    });
+
+    const savedTemplate = await this.leagueTemplateRepository.save(template);
+
+    return {
+      id: savedTemplate.id,
+      name: savedTemplate.name,
+      data: savedTemplate.data,
+      createdAt: savedTemplate.createdAt,
+    };
+  }
+
+  async deleteTemplate(id: number, userId: number): Promise<void> {
+    const template = await this.leagueTemplateRepository.findOne({
+      where: { id },
+    });
+
+    if (!template) {
+      throw new NotFoundException('템플릿을 찾을 수 없습니다.');
+    }
+
+    if (template.userId !== userId) {
+      throw new ForbiddenException('다른 사용자의 템플릿을 삭제할 수 없습니다.');
+    }
+
+    await this.leagueTemplateRepository.remove(template);
   }
 } 

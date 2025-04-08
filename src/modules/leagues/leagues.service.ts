@@ -106,15 +106,19 @@ export class LeaguesService {
       throw new ConflictException('이미 참가 신청한 리그입니다.');
     }
 
-    if (league.participants.length >= league.maxPlayers) {
-      throw new ConflictException('최대 참가자 수를 초과했습니다.');
-    }
+    // 참가자 수 조회하여 신청 순번 결정
+    const participantCount = await this.participantRepository.count({
+      where: { league: { id: leagueId } }
+    });
 
     const participant = this.participantRepository.create({
       league,
       user,
       status: ParticipantStatus.PENDING,
       skillLevel: dto.skillLevel,
+      nickname: dto.nickname || user.nickname,
+      orderNumber: participantCount + 1,
+      username: user.username,
     });
 
     await this.participantRepository.save(participant);

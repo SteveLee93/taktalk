@@ -26,6 +26,18 @@ export class LeagueParticipant {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
+  @ApiProperty({ description: '사용자 아이디' })
+  @Column()
+  username: string;
+
+  @ApiProperty({ description: '참가자 닉네임', required: false })
+  @Column({ nullable: true })
+  nickname: string;
+
+  @ApiProperty({ description: '신청 순번' })
+  @Column({ default: 0 })
+  orderNumber: number;
+
   @ApiProperty({ description: '참가 상태', enum: ParticipantStatus, default: ParticipantStatus.PENDING })
   @Column({
     type: 'enum',

@@ -83,12 +83,16 @@ export class AddOperatorDto {
 }
 
 export class ParticipateLeagueDto {
+  @ApiProperty({ description: '참가자 닉네임', required: false })
+  nickname?: string;
+
+  @ApiProperty({ description: '사용자 아이디' })
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+
+  @ApiProperty({ description: '참가자 부수', enum: SkillLevel })
   @IsEnum(SkillLevel)
-  @ApiProperty({
-    description: '참가자 부수',
-    enum: SkillLevel,
-    example: SkillLevel.FIVE
-  })
   skillLevel: SkillLevel;
 }
 

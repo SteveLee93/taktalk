@@ -18,4 +18,7 @@ export class LeagueOperator {
   @ManyToOne(() => User, user => user.operatingLeagues, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @ApiProperty({ description: '생성자 여부' })
+  isCreator?: boolean;
 } 

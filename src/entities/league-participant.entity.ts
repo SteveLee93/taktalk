@@ -28,7 +28,11 @@ export class LeagueParticipant {
 
   @ApiProperty({ description: '사용자 아이디' })
   @Column()
-  username: string;
+  userId: string;
+
+  @ApiProperty({ description: '참가자 이름', required: false })
+  @Column({ nullable: true })
+  name: string;
 
   @ApiProperty({ description: '참가자 닉네임', required: false })
   @Column({ nullable: true })

@@ -15,26 +15,26 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<User> {
-    const { username, email, nickname, password, ...rest } = registerDto;
+    const { userId, email, name, password, ...rest } = registerDto;
 
     // 중복 검사
     const existingUser = await this.userRepository.findOne({
       where: [
-        { username },
+        { userId },
         { email },
-        { nickname }
+        { name }
       ]
     });
 
     if (existingUser) {
-      if (existingUser.username === username) {
-        throw new ConflictException('이미 사용 중인 사용자 이름입니다.');
+      if (existingUser.userId === userId) {
+        throw new ConflictException('이미 사용 중인 아이디입니다.');
       }
       if (existingUser.email === email) {
         throw new ConflictException('이미 사용 중인 이메일입니다.');
       }
-      if (existingUser.nickname === nickname) {
-        throw new ConflictException('이미 사용 중인 닉네임입니다.');
+      if (existingUser.name === name) {
+        throw new ConflictException('이미 사용 중인 이름입니다.');
       }
     }
 
@@ -42,9 +42,9 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(password, 10);
     
     const user = this.userRepository.create({
-      username,
+      userId,
       email,
-      nickname,
+      name,
       password: hashedPassword,
       ...rest
     });
@@ -53,8 +53,8 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto): Promise<TokenResponseDto> {
-    const { username, password } = loginDto;
-    const user = await this.userRepository.findOne({ where: { username } });
+    const { userId, password } = loginDto;
+    const user = await this.userRepository.findOne({ where: { userId } });
 
     if (!user) {
       throw new UnauthorizedException('사용자를 찾을 수 없습니다.');
@@ -65,7 +65,7 @@ export class AuthService {
       throw new UnauthorizedException('비밀번호가 일치하지 않습니다.');
     }
 
-    const payload = { sub: user.id, username: user.username };
+    const payload = { sub: user.id, userId: user.userId };
     return {
       access_token: this.jwtService.sign(payload),
     };

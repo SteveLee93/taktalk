@@ -1,5 +1,5 @@
 -- 사용자 더미데이터
-INSERT INTO user (username, password, nickname, email, phone) VALUES
+INSERT INTO user (userId, password, name, email, phone) VALUES
 ('player1', '$2b$10$abcd', '김탁구', 'player1@test.com', '010-1111-1111'),
 ('player2', '$2b$10$abcd', '이탁구', 'player2@test.com', '010-1111-1112'),
 ('player3', '$2b$10$abcd', '박탁구', 'player3@test.com', '010-1111-1113'),
@@ -32,7 +32,7 @@ INSERT INTO league (
   '서울시',
   '강남구',
   '강남탁구장',
-  '매주 토요일 14:00-18:00',
+  '2024-03-02 14:00:00',
   4,
   '우승: 50만원, 준우승: 30만원, 3위: 10만원',
   '2024년 봄 시즌 아마추어 탁구 대회입니다.',
@@ -46,7 +46,7 @@ INSERT INTO league (
 
 -- 리그 운영진 더미데이터
 INSERT INTO league_operator (league_id, user_id)
-SELECT 1, id FROM user WHERE username IN ('operator1', 'operator2');
+SELECT 1, id FROM user WHERE userId IN ('operator1', 'operator2');
 
 -- 리그 참가자 더미데이터 (16명)
 INSERT INTO league_participant (league_id, user_id, status, skilllevel)
@@ -61,5 +61,5 @@ SELECT
     ELSE '4'
   END
 FROM user 
-WHERE username LIKE 'player%'
+WHERE userId LIKE 'player%'
 LIMIT 16; 

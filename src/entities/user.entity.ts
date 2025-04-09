@@ -4,33 +4,38 @@ import { LeagueOperator } from './league-operator.entity';
 import { LeagueParticipant } from './league-participant.entity';
 import { PlayerInGroup } from './player-in-group.entity';
 import { MatchResult } from './match-result.entity';
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 
 @Entity()
 export class User {
   @ApiProperty({ description: '사용자 ID' })
   @PrimaryGeneratedColumn()
+  @Expose()
   id: number;
 
-  @ApiProperty({ description: '사용자 이름' })
+  @ApiProperty({ description: '로그인 아이디' })
   @Column({ unique: true })
-  username: string;
+  @Expose()
+  userId: string;
 
   @ApiProperty({ description: '비밀번호' })
   @Column()
   @Exclude()
   password: string;
 
-  @ApiProperty({ description: '닉네임' })
+  @ApiProperty({ description: '이름' })
   @Column({ unique: true })
-  nickname: string;
+  @Expose()
+  name: string;
 
   @ApiProperty({ description: '이메일' })
   @Column({ unique: true })
+  @Expose()
   email: string;
 
   @ApiProperty({ description: '전화번호', required: false })
   @Column({ nullable: true })
+  @Expose()
   phone: string;
 
   @OneToMany(() => LeagueOperator, operator => operator.user)

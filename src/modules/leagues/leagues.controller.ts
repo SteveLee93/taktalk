@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query, Delete } from '@nestjs/common';
+import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query, Delete, UseInterceptors, ClassSerializerInterceptor } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { LeaguesService } from './leagues.service';
@@ -9,6 +9,7 @@ import { League } from '../../entities/league.entity';
 @ApiTags('리그')
 @Controller('leagues')
 @ApiBearerAuth()
+@UseInterceptors(ClassSerializerInterceptor)
 export class LeaguesController {
   constructor(private readonly leaguesService: LeaguesService) {}
 
@@ -137,5 +138,17 @@ export class LeaguesController {
   })
   async getLeagues(): Promise<League[]> {
     return this.leaguesService.getLeagues();
+  }
+
+  @Delete(':id/operators/:operatorId')
+  @ApiOperation({ summary: '리그 운영자 삭제' })
+  @ApiResponse({ status: 200, description: '운영자 삭제 성공' })
+  @UseGuards(JwtAuthGuard)
+  async removeOperator(
+    @Param('id') id: number,
+    @Param('operatorId') operatorId: number,
+    @Request() req,
+  ): Promise<void> {
+    return this.leaguesService.removeOperator(id, operatorId, req.user.id);
   }
 } 

@@ -1,25 +1,26 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsEmail, MinLength, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsEmail, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class RegisterDto {
-  @ApiProperty({ description: '사용자 이름' })
+  @ApiProperty({ description: '로그인 아이디' })
   @IsString()
   @IsNotEmpty()
-  username: string;
-
-  @ApiProperty({ description: '비밀번호' })
-  @IsString()
-  @MinLength(6)
-  password: string;
-
-  @ApiProperty({ description: '닉네임' })
-  @IsString()
-  @IsNotEmpty()
-  nickname: string;
+  userId: string;
 
   @ApiProperty({ description: '이메일' })
   @IsEmail()
+  @IsNotEmpty()
   email: string;
+
+  @ApiProperty({ description: '이름' })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({ description: '비밀번호' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
 
   @ApiProperty({ description: '전화번호', required: false })
   @IsString()
@@ -28,10 +29,10 @@ export class RegisterDto {
 }
 
 export class LoginDto {
-  @ApiProperty({ description: '사용자 이름' })
+  @ApiProperty({ description: '로그인 아이디' })
   @IsString()
   @IsNotEmpty()
-  username: string;
+  userId: string;
 
   @ApiProperty({ description: '비밀번호' })
   @IsString()

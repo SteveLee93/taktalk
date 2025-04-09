@@ -41,29 +41,30 @@ export class LeaguesService {
   async addOperator(leagueId: number, addOperatorDto: AddOperatorDto, userId: number): Promise<void> {
     const league = await this.leagueRepository.findOne({
       where: { id: leagueId },
-      relations: ['operators'],
+      relations: ['operators', 'creator'],
     });
 
     if (!league) {
       throw new NotFoundException('리그를 찾을 수 없습니다.');
     }
 
-    // 현재 사용자가 운영자인지 확인
+    // 현재 사용자가 운영자이거나 생성자인지 확인
     const isOperator = await this.operatorRepository.findOne({
       where: { league: { id: leagueId }, user: { id: userId } },
     });
+    const isCreator = league.creator.id === userId;
 
-    if (!isOperator) {
-      throw new UnauthorizedException('리그 운영자만 다른 운영자를 추가할 수 있습니다.');
+    if (!isOperator && !isCreator) {
+      throw new UnauthorizedException('리그 운영자 또는 주최자만 다른 운영자를 추가할 수 있습니다.');
     }
 
-    // 닉네임으로 사용자 찾기
+    // username으로 사용자 찾기
     const newOperator = await this.userRepository.findOne({
-      where: { nickname: addOperatorDto.nickname },
+      where: { userId: addOperatorDto.userId },
     });
 
     if (!newOperator) {
-      throw new NotFoundException('해당 닉네임의 사용자를 찾을 수 없습니다.');
+      throw new NotFoundException('해당 아이디의 사용자를 찾을 수 없습니다.');
     }
 
     // 이미 운영자인지 확인
@@ -114,11 +115,12 @@ export class LeaguesService {
     const participant = this.participantRepository.create({
       league,
       user,
+      userId: user.userId,
       status: ParticipantStatus.PENDING,
       skillLevel: dto.skillLevel,
-      nickname: dto.nickname || user.nickname,
-      orderNumber: participantCount + 1,
-      username: user.username,
+      name: user.name,
+      nickname: dto.name,
+      orderNumber: participantCount + 1
     });
 
     await this.participantRepository.save(participant);
@@ -130,13 +132,23 @@ export class LeaguesService {
     dto: UpdateParticipantStatusDto,
     userId: number,
   ): Promise<void> {
-    // 운영자 권한 확인
+    const league = await this.leagueRepository.findOne({
+      where: { id: leagueId },
+      relations: ['creator', 'operators'],
+    });
+
+    if (!league) {
+      throw new NotFoundException('리그를 찾을 수 없습니다.');
+    }
+
+    // 운영자 또는 주최자 권한 확인
     const isOperator = await this.operatorRepository.findOne({
       where: { league: { id: leagueId }, user: { id: userId } },
     });
+    const isCreator = league.creator.id === userId;
 
-    if (!isOperator) {
-      throw new UnauthorizedException('리그 운영자만 참가 상태를 변경할 수 있습니다.');
+    if (!isOperator && !isCreator) {
+      throw new UnauthorizedException('리그 운영자 또는 주최자만 참가 상태를 변경할 수 있습니다.');
     }
 
     const participant = await this.participantRepository.findOne({
@@ -149,25 +161,62 @@ export class LeaguesService {
 
     // 상태 변경
     participant.status = dto.status;
+    
+    // 부수 변경 (제공된 경우에만)
+    if (dto.skillLevel !== undefined) {
+      participant.skillLevel = dto.skillLevel;
+    }
+
     await this.participantRepository.save(participant);
   }
 
   async getLeague(id: number): Promise<League> {
     const league = await this.leagueRepository.findOne({
       where: { id },
-      relations: ['creator', 'operators', 'participants'],
+      relations: [
+        'creator', 
+        'operators', 
+        'operators.user',
+        'participants'
+      ],
     });
 
     if (!league) {
       throw new NotFoundException('리그를 찾을 수 없습니다.');
     }
 
+    // 운영자 정보 가공
+    league.operators = league.operators.map(operator => ({
+      ...operator,
+      userId: operator.user.userId,
+      name: operator.user.name,
+      phone: operator.user.phone,
+      isCreator: operator.user.id === league.creator.id
+    }));
+
     return league;
   }
 
   async getLeagues(): Promise<League[]> {
-    return this.leagueRepository.find({
-      relations: ['creator', 'operators', 'participants'],
+    const leagues = await this.leagueRepository.find({
+      relations: [
+        'creator', 
+        'operators', 
+        'operators.user',
+        'participants'
+      ],
+    });
+
+    // 각 리그의 운영자 정보 가공
+    return leagues.map(league => {
+      league.operators = league.operators.map(operator => ({
+        ...operator,
+        userId: operator.user.userId,
+        name: operator.user.name,
+        phone: operator.user.phone,
+        isCreator: operator.user.id === league.creator.id
+      }));
+      return league;
     });
   }
 
@@ -242,5 +291,43 @@ export class LeaguesService {
     }
 
     await this.leagueTemplateRepository.remove(template);
+  }
+
+  async removeOperator(leagueId: number, operatorId: number, userId: number): Promise<void> {
+    const league = await this.leagueRepository.findOne({
+      where: { id: leagueId },
+      relations: ['creator', 'operators'],
+    });
+
+    if (!league) {
+      throw new NotFoundException('리그를 찾을 수 없습니다.');
+    }
+
+    // 현재 사용자가 운영자이거나 생성자인지 확인
+    const isOperator = await this.operatorRepository.findOne({
+      where: { league: { id: leagueId }, user: { id: userId } },
+    });
+    const isCreator = league.creator.id === userId;
+
+    if (!isOperator && !isCreator) {
+      throw new UnauthorizedException('리그 운영자 또는 주최자만 운영자를 삭제할 수 있습니다.');
+    }
+
+    // 삭제할 운영자 찾기
+    const operatorToRemove = await this.operatorRepository.findOne({
+      where: { id: operatorId, league: { id: leagueId } },
+      relations: ['user'],
+    });
+
+    if (!operatorToRemove) {
+      throw new NotFoundException('해당 운영자를 찾을 수 없습니다.');
+    }
+
+    // 생성자는 삭제할 수 없음
+    if (operatorToRemove.user.id === league.creator.id) {
+      throw new ForbiddenException('리그 생성자는 운영자에서 삭제할 수 없습니다.');
+    }
+
+    await this.operatorRepository.remove(operatorToRemove);
   }
 } 

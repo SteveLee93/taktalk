@@ -76,20 +76,15 @@ export class CreateLeagueDto {
 }
 
 export class AddOperatorDto {
-  @ApiProperty({ description: '운영자 닉네임' })
+  @ApiProperty({ description: '운영자 로그인 아이디' })
   @IsString()
   @IsNotEmpty()
-  nickname: string;
+  userId: string;
 }
 
 export class ParticipateLeagueDto {
-  @ApiProperty({ description: '참가자 닉네임', required: false })
-  nickname?: string;
-
-  @ApiProperty({ description: '사용자 아이디' })
-  @IsString()
-  @IsNotEmpty()
-  username: string;
+  @ApiProperty({ description: '참가자 이름', required: false })
+  name?: string;
 
   @ApiProperty({ description: '참가자 부수', enum: SkillLevel })
   @IsEnum(SkillLevel)
@@ -104,6 +99,16 @@ export class UpdateParticipantStatusDto {
     example: ParticipantStatus.APPROVED
   })
   status: ParticipantStatus;
+
+  @IsEnum(SkillLevel)
+  @IsOptional()
+  @ApiProperty({
+    description: '참가자 부수',
+    enum: SkillLevel,
+    required: false,
+    example: SkillLevel.FIVE
+  })
+  skillLevel?: SkillLevel;
 }
 
 export class SearchLeagueDto {

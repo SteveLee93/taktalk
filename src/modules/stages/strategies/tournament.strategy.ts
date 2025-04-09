@@ -296,7 +296,7 @@ export class TournamentStageStrategy implements StageStrategy {
     console.log(`분류 전 전체 플레이어 수: ${players.length}명`);
     players.forEach(p => {
       const origin = playerOrigins[p.id];
-      console.log(`플레이어 ID ${p.id}, 이름: ${p.nickname}, 랭크: ${origin?.rank || '없음'}, 그룹: ${origin?.groupId || '없음'}`);
+      console.log(`플레이어 ID ${p.id}, 이름: ${p.name}, 랭크: ${origin?.rank || '없음'}, 그룹: ${origin?.groupId || '없음'}`);
     });
 
     // 플레이어 정보 분류
@@ -304,12 +304,12 @@ export class TournamentStageStrategy implements StageStrategy {
     for (const player of players) {
       const origin = playerOrigins[player.id];
       if (!origin || origin.groupId === undefined) {
-        console.error(`오류: 플레이어 ID ${player.id}, 이름: ${player.nickname}의 소속 그룹 정보가 없습니다.`);
+        console.error(`오류: 플레이어 ID ${player.id}, 이름: ${player.name}의 소속 그룹 정보가 없습니다.`);
         continue;
       }
 
       const rank = origin.rank || 1;
-      console.log(`플레이어 ${player.nickname} (ID: ${player.id}) 분류 중: 랭크=${rank}, 범위 체크=${rank >= minRank && rank <= maxRank}`);
+      console.log(`플레이어 ${player.name} (ID: ${player.id}) 분류 중: 랭크=${rank}, 범위 체크=${rank >= minRank && rank <= maxRank}`);
 
       // 지정된 랭크 범위 내에 있는지 확인
       if (rank >= minRank && rank <= maxRank) {
@@ -328,7 +328,7 @@ export class TournamentStageStrategy implements StageStrategy {
           console.error(`오류: 랭크 인덱스(${rankIndex})가 범위를 벗어납니다 (0-${rankGroups.length - 1})`);
         }
       } else {
-        console.log(`제외됨: 플레이어 ${player.nickname}(랭크 ${rank})는 범위(${minRank}-${maxRank}) 밖입니다.`);
+        console.log(`제외됨: 플레이어 ${player.name}(랭크 ${rank})는 범위(${minRank}-${maxRank}) 밖입니다.`);
       }
     }
 
@@ -580,7 +580,7 @@ export class TournamentStageStrategy implements StageStrategy {
       
       // 플레이어 rank 로그 출력
       group.players.forEach(p => {
-        console.log(`플레이어 ${p.user.nickname} (ID: ${p.user.id}), 랭크: ${p.rank}`);
+        console.log(`플레이어 ${p.user.name} (ID: ${p.user.id}), 랭크: ${p.rank}`);
       });
       
       const rankedPlayers = await this.getRankedPlayersInGroup(group);
@@ -595,7 +595,7 @@ export class TournamentStageStrategy implements StageStrategy {
         if (rankedPlayers[rank]) {
           if (rankIndex >= 0 && rankIndex < playersByRank.length) {
             playersByRank[rankIndex].push(rankedPlayers[rank]);
-            console.log(`${group.number}조 ${rank+1}등 플레이어 추가: ID ${rankedPlayers[rank].id}, 이름: ${rankedPlayers[rank].nickname}, 배열 인덱스 ${rankIndex}`);
+            console.log(`${group.number}조 ${rank+1}등 플레이어 추가: ID ${rankedPlayers[rank].id}, 이름: ${rankedPlayers[rank].name}, 배열 인덱스 ${rankIndex}`);
           } else {
             console.error(`오류: 배열 인덱스(${rankIndex})가 범위를 벗어남 (0-${playersByRank.length-1})`);
           }
@@ -624,7 +624,7 @@ export class TournamentStageStrategy implements StageStrategy {
     for (let i = 0; i < seededPlayers.length; i++) {
       const player = seededPlayers[i];
       const origin = player ? this.getPlayerOriginFromGroups(player.id, groups) : null;
-      console.log(`Seed ${i + 1}: Player ID ${player?.id || 'unknown'}, 이름: ${player?.nickname}, ${origin ? `${origin.groupName} ${origin.rank}등` : 'unknown origin'}`);
+      console.log(`Seed ${i + 1}: Player ID ${player?.id || 'unknown'}, 이름: ${player?.name}, ${origin ? `${origin.groupName} ${origin.rank}등` : 'unknown origin'}`);
     }
     
     return seededPlayers;
@@ -683,7 +683,7 @@ export class TournamentStageStrategy implements StageStrategy {
     
     // 로그 출력
     playersByRank.forEach(player => {
-      console.log(`${group.number}조 ${player.rank}등: ${player.user.nickname} (ID: ${player.user.id})`);
+      console.log(`${group.number}조 ${player.rank}등: ${player.user.name} (ID: ${player.user.id})`);
     });
     
     return playersByRank.map(p => p.user);

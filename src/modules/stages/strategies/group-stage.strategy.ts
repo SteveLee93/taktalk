@@ -58,7 +58,7 @@ export class GroupStageStrategy implements StageStrategy {
           rank: j + 1, // 초기 순위 설정 (1부터 시작)
         });
         await this.playerInGroupRepository.save(playerInGroup);
-        console.log(`그룹 ${groupNumber}에 ${player.nickname}(${player.id}) 추가, 초기 순위: ${j + 1}`);
+        console.log(`그룹 ${groupNumber}에 ${player.name}(${player.id}) 추가, 초기 순위: ${j + 1}`);
       }
     }
   }
@@ -360,7 +360,7 @@ export class GroupStageStrategy implements StageStrategy {
       const player = sortedPlayers[i];
       player.rank = i + 1;
       await playerInGroupRepo.save(player);
-      console.log(`플레이어 ${player.user.nickname}의 순위 업데이트: ${i+1}등`);
+      console.log(`플레이어 ${player.user.name}의 순위 업데이트: ${i+1}등`);
     }
   }
 } 

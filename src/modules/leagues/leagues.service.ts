@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { League } from '../../entities/league.entity';
@@ -6,22 +6,27 @@ import { User } from '../../entities/user.entity';
 import { LeagueOperator } from '../../entities/league-operator.entity';
 import { LeagueParticipant, ParticipantStatus } from '../../entities/league-participant.entity';
 import { LeagueTemplate } from '../../entities/league-template.entity';
-import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto, ParticipateLeagueDto, SearchLeagueDto } from './dto/league.dto';
+import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto, ParticipateLeagueDto, SearchLeagueDto, UpdateLeagueStatusDto } from './dto/league.dto';
 import { CreateLeagueTemplateDto, LeagueTemplateDto } from './dto/league-template.dto';
+import { LeagueStatus } from '../../common/enums/league-status.enum';
+import { StagesService } from '../stages/stages.service';
+import { StageType } from '../../common/enums/stage-type.enum';
+import { BracketType, SeedingType } from '../../common/types/stage-options.type';
 
 @Injectable()
 export class LeaguesService {
   constructor(
     @InjectRepository(League)
-    private leagueRepository: Repository<League>,
+    private readonly leagueRepository: Repository<League>,
     @InjectRepository(User)
-    private userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(LeagueOperator)
-    private operatorRepository: Repository<LeagueOperator>,
+    private readonly operatorRepository: Repository<LeagueOperator>,
     @InjectRepository(LeagueParticipant)
-    private participantRepository: Repository<LeagueParticipant>,
+    private readonly participantRepository: Repository<LeagueParticipant>,
     @InjectRepository(LeagueTemplate)
-    private leagueTemplateRepository: Repository<LeagueTemplate>,
+    private readonly leagueTemplateRepository: Repository<LeagueTemplate>,
+    private readonly stagesService: StagesService,
   ) {}
 
   async createLeague(createLeagueDto: CreateLeagueDto, userId: number): Promise<League> {
@@ -33,9 +38,52 @@ export class LeaguesService {
     const league = this.leagueRepository.create({
       ...createLeagueDto,
       creator: user,
+      status: LeagueStatus.ORGANIZING,
     });
     
-    return await this.leagueRepository.save(league);
+    const savedLeague = await this.leagueRepository.save(league);
+
+    // 기본 스테이지 생성 (예선 스테이지)
+    await this.stagesService.createStage({
+      leagueId: savedLeague.id,
+      name: '예선',
+      order: 1,
+      type: StageType.GROUP,
+      options: {
+        matchFormat: {
+          gamesRequired: 5,
+          setsRequired: 3
+        },
+        groupCount: 4,
+        playersPerGroup: 4,
+        advancingPlayersCount: 2
+      },
+      groups: []
+    });
+
+    // 본선 스테이지 생성
+    await this.stagesService.createStage({
+      leagueId: savedLeague.id,
+      name: '본선',
+      order: 2,
+      type: StageType.TOURNAMENT,
+      options: {
+        matchFormat: {
+          gamesRequired: 5,
+          setsRequired: 3
+        },
+        bracketType: 'SINGLE_ELIMINATION',
+        seeding: {
+          type: 'GROUP_RANK',
+          qualificationCriteria: {
+            rankCutoff: 2
+          }
+        }
+      },
+      groups: []
+    });
+
+    return this.getLeague(savedLeague.id);
   }
 
   async addOperator(leagueId: number, addOperatorDto: AddOperatorDto, userId: number): Promise<void> {
@@ -177,8 +225,26 @@ export class LeaguesService {
         'creator', 
         'operators', 
         'operators.user',
-        'participants'
+        'participants',
+        'participants.user',
+        'stages',
+        'stages.groups',
+        'stages.groups.players',
+        'stages.groups.players.user',
+        'stages.matches',
+        'stages.matches.player1',
+        'stages.matches.player2',
+        'stages.matches.result',
+        'stages.matches.result.winner'
       ],
+      order: {
+        stages: {
+          order: 'ASC',
+          matches: {
+            order: 'ASC'
+          }
+        }
+      }
     });
 
     if (!league) {
@@ -203,8 +269,26 @@ export class LeaguesService {
         'creator', 
         'operators', 
         'operators.user',
-        'participants'
+        'participants',
+        'participants.user',
+        'stages',
+        'stages.groups',
+        'stages.groups.players',
+        'stages.groups.players.user',
+        'stages.matches',
+        'stages.matches.player1',
+        'stages.matches.player2',
+        'stages.matches.result',
+        'stages.matches.result.winner'
       ],
+      order: {
+        stages: {
+          order: 'ASC',
+          matches: {
+            order: 'ASC'
+          }
+        }
+      }
     });
 
     // 각 리그의 운영자 정보 가공
@@ -216,6 +300,7 @@ export class LeaguesService {
         phone: operator.user.phone,
         isCreator: operator.user.id === league.creator.id
       }));
+
       return league;
     });
   }
@@ -224,6 +309,7 @@ export class LeaguesService {
     const queryBuilder = this.leagueRepository.createQueryBuilder('league')
       .leftJoinAndSelect('league.creator', 'creator')
       .leftJoinAndSelect('league.operators', 'operators')
+      .leftJoinAndSelect('operators.user', 'operatorUser')
       .leftJoinAndSelect('league.participants', 'participants');
 
     if (searchDto.city) {
@@ -239,7 +325,19 @@ export class LeaguesService {
         .andWhere('league.maxSkillLevel >= :skillLevel', { skillLevel: searchDto.skillLevel });
     }
 
-    return queryBuilder.getMany();
+    const leagues = await queryBuilder.getMany();
+
+    // 각 리그의 운영자 정보 가공
+    return leagues.map(league => {
+      league.operators = league.operators.map(operator => ({
+        ...operator,
+        userId: operator.user.userId,
+        name: operator.user.name,
+        phone: operator.user.phone,
+        isCreator: operator.user.id === league.creator.id
+      }));
+      return league;
+    });
   }
 
   // 템플릿 관련 메서드
@@ -329,5 +427,34 @@ export class LeaguesService {
     }
 
     await this.operatorRepository.remove(operatorToRemove);
+  }
+
+  async updateLeagueStatus(
+    leagueId: number,
+    dto: UpdateLeagueStatusDto,
+    userId: number
+  ): Promise<void> {
+    const league = await this.leagueRepository.findOne({
+      where: { id: leagueId },
+      relations: ['creator', 'operators'],
+    });
+
+    if (!league) {
+      throw new NotFoundException('리그를 찾을 수 없습니다.');
+    }
+
+    // 운영자 또는 생성자 권한 확인
+    const isOperator = await this.operatorRepository.findOne({
+      where: { league: { id: leagueId }, user: { id: userId } },
+    });
+    const isCreator = league.creator.id === userId;
+
+    if (!isOperator && !isCreator) {
+      throw new UnauthorizedException('리그 운영자 또는 주최자만 상태를 변경할 수 있습니다.');
+    }
+
+    // 상태 변경
+    league.status = dto.status;
+    await this.leagueRepository.save(league);
   }
 } 

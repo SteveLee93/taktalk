@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, IsNumber, IsEnum, ValidateNested, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { StageType } from '../../../common/types/stage-options.type';
+import { StageType } from '../../../common/enums/stage-type.enum';
 import { BaseStageOptions, GroupStageOptions, TournamentOptions } from '../../../common/types/stage-options.type';
 
 export class CreateStageDto {
@@ -65,37 +65,17 @@ export class CreateStageDto {
         },
         description: '예선 단계 설정 예시',
       },
-      TOURNAMENT_UPPER: {
-        value: {
-          matchFormat: {
-            gamesRequired: 7,  // 7판
-            setsRequired: 4,   // 4선승
-          },
-          bracketType: 'UPPER',        // 상위부
-          playerCount: 16,             // 16명 참가
-          startRound: 4,              // 16강 (2^4 = 16)
-          seeding: {
-            type: 'GROUP_RANK',        // 조별 순위 기반 시드 배정
-            groupRankWeights: [1, 0.7, 0.5, 0.3] // 조별 순위별 가중치
-          }
-        },
-        description: '본선 상위부 토너먼트 설정 예시 (16강)',
-      },
-      TOURNAMENT_LOWER: {
+      TOURNAMENT: {
         value: {
           matchFormat: {
             gamesRequired: 5,  // 5판
             setsRequired: 3,   // 3선승
           },
-          bracketType: 'LOWER',        // 하위부
-          playerCount: 16,             // 16명 참가
-          startRound: 4,              // 16강 (2^4 = 16)
-          seeding: {
-            type: 'GROUP_RANK',        // 조별 순위 기반 시드 배정
-            groupRankWeights: [0.3, 0.5, 0.7, 1] // 조별 순위별 가중치 (상위부와 반대)
-          }
+          "rankCutoff": 4,
+          "minRank": 1,
+          "maxRank": 3
         },
-        description: '본선 하위부 토너먼트 설정 예시 (16강)',
+        description: '본선 토너먼트 설정 예시 (16강)',
       }
     },
   })

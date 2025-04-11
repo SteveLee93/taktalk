@@ -12,6 +12,8 @@ import { GroupStageOptions } from '../../../common/types/stage-options.type';
 import { MatchResult } from '../../../entities/match-result.entity';
 import { SetScoreDto } from '../dto/match.dto';
 import { EntityManager } from 'typeorm';
+import { LeagueParticipant } from '../../../entities/league-participant.entity';
+import { In } from 'typeorm';
 
 @Injectable()
 export class GroupStageStrategy implements StageStrategy {
@@ -24,6 +26,8 @@ export class GroupStageStrategy implements StageStrategy {
     private matchRepository: Repository<Match>,
     @InjectRepository(MatchResult)
     private readonly matchResultRepository: Repository<MatchResult>,
+    @InjectRepository(LeagueParticipant)
+    private readonly participantRepository: Repository<LeagueParticipant>,
   ) {}
 
   async createGroups(stage: Stage, players: User[]): Promise<void> {
@@ -56,15 +60,24 @@ export class GroupStageStrategy implements StageStrategy {
           group,
           user: player,
           rank: j + 1, // 초기 순위 설정 (1부터 시작)
+          orderNumber: j + 1, // 표시 순서도 설정 (1부터 시작)
         });
         await this.playerInGroupRepository.save(playerInGroup);
-        console.log(`그룹 ${groupNumber}에 ${player.name}(${player.id}) 추가, 초기 순위: ${j + 1}`);
+        console.log(`그룹 ${groupNumber}에 ${player.name}(${player.id}) 추가, 초기 순위: ${j + 1}, 순서: ${j + 1}`);
       }
     }
   }
 
   private getMatchPattern(n: number): [number, number][] {
+    console.log(`그룹의 플레이어 수: ${n}명, 매치 패턴을 생성합니다.`);
+    
     switch (n) {
+      case 2:
+        console.log('2명 매치 패턴 사용');
+        return [[1,2]];
+      case 3:
+        console.log('3명 매치 패턴 사용');
+        return [[1,2], [1,3], [2,3]];
       case 4:
         return [[1,4], [2,3], [1,3], [2,4], [1,2], [3,4]];
       case 5:
@@ -85,12 +98,14 @@ export class GroupStageStrategy implements StageStrategy {
         return [[1,12], [2,11], [3,10], [4,9], [5,8], [6,7], [1,11], [10,12], [2,9], [3,8], [4,7], [5,6], [1,10], [9,11], [8,12], [2,7], [3,6], [4,5], [1,9], [8,10], [7,11], [6,12], [2,5], [3,4], [1,8], [7,9], [6,10], [5,11], [4,12], [2,3], [1,7], [6,8], [5,9], [4,10], [3,11], [2,12], [1,6], [5,7], [4,8], [3,9], [2,10], [11,12], [1,5], [4,6], [3,7], [2,8], [9,12], [10,11], [1,4], [3,5], [2,6], [7,12], [8,11], [9,10], [1,3], [2,4], [5,12], [6,11], [7,10], [8,9], [1,2], [3,12], [4,11], [5,10], [6,9], [7,8]];
       default:
         // 기본 패턴: 모든 플레이어가 서로 한 번씩 대전
+        console.log(`기본 패턴 생성 (${n}명)`);
         const pattern: [number, number][] = [];
         for (let i = 1; i <= n; i++) {
           for (let j = i + 1; j <= n; j++) {
             pattern.push([i, j]);
           }
         }
+        console.log('생성된 패턴:', pattern);
         return pattern;
     }
   }
@@ -98,20 +113,61 @@ export class GroupStageStrategy implements StageStrategy {
   async createMatches(stage: Stage): Promise<void> {
     const groups = await this.groupRepository.find({
       where: { stage: { id: stage.id } },
-      relations: ['players', 'players.user'],
+      relations: ['players', 'players.user', 'stage', 'stage.league'],
       order: { number: 'ASC' }  // 조 순서대로 처리
     });
 
+    console.log(`스테이지 ${stage.id}의 그룹 수: ${groups.length}`);
+
     for (const group of groups) {
-      const players = group.players.map(pig => pig.user);
+      console.log(`그룹 ${group.id}(${group.name}) 매치 생성 시작`);
+      
+      // 각 그룹의 플레이어를 orderNumber 순으로 정렬
+      if (group.players) {
+        group.players.sort((a, b) => a.orderNumber - b.orderNumber);
+      }
+      
+      // 그룹의 플레이어 ID 목록 추출 (orderNumber 순서 유지)
+      const playerIds = group.players.map(p => p.user.id);
+      console.log(`그룹 ${group.id}의 플레이어 ID 순서:`, playerIds);
+      
+      // 플레이어 정보 조회 (ID 순서 유지)
+      const players: LeagueParticipant[] = [];
+      for (const userId of playerIds) {
+        const participant = await this.participantRepository.findOne({
+          where: {
+            league: { id: group.stage.league.id },
+            user: { id: userId }
+          }
+        });
+        if (participant) {
+          players.push(participant);
+        }
+      }
+      
+      console.log(`그룹 ${group.id}의 플레이어 수: ${players.length}`);
+      if (players.length < 2) {
+        console.log(`그룹 ${group.id}의 플레이어가 2명 미만이라 매치를 생성하지 않습니다.`);
+        continue;
+      }
+      
       const n = players.length;
 
       // 매치 순서 패턴 정의
       const matchPattern = this.getMatchPattern(n);
+      console.log(`생성할 매치 수: ${matchPattern.length}`);
+      
       let matchOrder = 1;
 
       for (const [p1, p2] of matchPattern) {
         // 플레이어 인덱스는 1부터 시작하므로 -1 해서 0부터 시작하는 배열 인덱스로 변환
+        console.log(`매치 생성: ${p1}번 플레이어 vs ${p2}번 플레이어`);
+        
+        if (p1 - 1 >= players.length || p2 - 1 >= players.length) {
+          console.log(`유효하지 않은 플레이어 인덱스: ${p1}, ${p2}`);
+          continue;
+        }
+        
         const match = this.matchRepository.create({
           stage,
           group,
@@ -119,13 +175,16 @@ export class GroupStageStrategy implements StageStrategy {
           player2: players[p2 - 1],
           status: MatchStatus.SCHEDULED,
           order: matchOrder,
-          groupNumber: group.number, // order 대신 number 사용
-          description: `${group.name} ${matchOrder}경기`, // 예: "1조 1경기"
+          groupNumber: group.number,
+          description: `${group.name} ${matchOrder}경기`,
           round: 1
         });
         await this.matchRepository.save(match);
+        console.log(`매치 저장 완료: ID ${match.id}`);
         matchOrder++;
       }
+
+      console.log(`그룹 ${group.id}의 매치 생성 완료`);
     }
   }
 
@@ -265,7 +324,7 @@ export class GroupStageStrategy implements StageStrategy {
           .remove(existingResult);
         
         // 매치의 result 관계도 제거
-        match.result = null as any;  // TypeORM에서는 관계를 제거할 때 null을 사용
+        match.result = null as any;
         await transactionalEntityManager
           .getRepository(Match)
           .save(match);
@@ -343,24 +402,33 @@ export class GroupStageStrategy implements StageStrategy {
       }
     });
     
-    // 승리 수로 플레이어 정렬
-    const sortedPlayers = [...group.players]
-      .sort((a, b) => {
-        const winsA = playerWins.get(a.user.id) || 0;
-        const winsB = playerWins.get(b.user.id) || 0;
-        return winsB - winsA; // 승리 많은 순
-      });
+    // 각 플레이어의 승리 수에 따라 등수 결정 (원본 배열은 수정하지 않음)
+    const playerRanks = new Map<number, number>();
     
-    // 순위 업데이트
+    // 승리 수 기준으로 정렬된 플레이어 ID 배열 생성
+    const sortedPlayerIds = [...playerWins.entries()]
+      .sort((a, b) => b[1] - a[1]) // 승리 많은 순으로 정렬
+      .map(entry => entry[0]);
+      
+    // 각 플레이어에게 등수 할당
+    sortedPlayerIds.forEach((playerId, index) => {
+      playerRanks.set(playerId, index + 1);
+    });
+    
+    // 원본 플레이어 순서는 유지하고 rank만 업데이트
     const playerInGroupRepo = entityManager 
       ? entityManager.getRepository(PlayerInGroup) 
       : this.playerInGroupRepository;
       
-    for (let i = 0; i < sortedPlayers.length; i++) {
-      const player = sortedPlayers[i];
-      player.rank = i + 1;
-      await playerInGroupRepo.save(player);
-      console.log(`플레이어 ${player.user.name}의 순위 업데이트: ${i+1}등`);
+    for (const player of group.players) {
+      const newRank = playerRanks.get(player.user.id) || 0;
+      console.log(`플레이어 ${player.user.name}의 순위 업데이트: ${player.rank} -> ${newRank}등`);
+      
+      // rank 값만 변경하고 저장
+      if (player.rank !== newRank) {
+        player.rank = newRank;
+        await playerInGroupRepo.save(player);
+      }
     }
   }
 } 

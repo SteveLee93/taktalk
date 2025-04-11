@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, ManyToOne, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Match } from './match.entity';
-import { User } from './user.entity';
+import { LeagueParticipant } from './league-participant.entity';
 
 @Entity()
 export class MatchResult {
@@ -14,10 +14,10 @@ export class MatchResult {
   @JoinColumn({ name: 'match_id' })
   match: Match;
 
-  @ApiProperty({ description: '승자', type: () => User })
-  @ManyToOne(() => User, { onDelete: 'SET NULL' })
+  @ApiProperty({ description: '승자', type: () => LeagueParticipant })
+  @ManyToOne(() => LeagueParticipant, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'winner_id' })
-  winner: User;
+  winner: LeagueParticipant;
 
   @ApiProperty({ description: '점수 상세' })
   @Column('json')

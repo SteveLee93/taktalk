@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNumber, IsArray, IsNotEmpty, IsOptional, IsEnum, IsDateString } from 'class-validator';
 import { ParticipantStatus } from '../../../entities/league-participant.entity';
 import { SkillLevel } from '../../../common/enums/skill-level.enum';
+import { LeagueStatus } from '../../../common/enums/league-status.enum';
 
 export class CreateLeagueDto {
   @ApiProperty({ description: '리그 이름' })
@@ -131,4 +132,14 @@ export class SearchLeagueDto {
   @IsEnum(SkillLevel)
   @IsOptional()
   skillLevel?: SkillLevel;
+}
+
+export class UpdateLeagueStatusDto {
+  @IsEnum(LeagueStatus)
+  @ApiProperty({
+    description: '변경할 리그 상태',
+    enum: LeagueStatus,
+    example: LeagueStatus.ORGANIZING
+  })
+  status: LeagueStatus;
 } 

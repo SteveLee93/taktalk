@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNumber, IsEnum, ValidateNested, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { StageType } from '../../../common/types/stage-options.type';
+import { StageType } from '../../../common/enums/stage-type.enum';
 import { GroupStageOptions, TournamentOptions } from '../../../common/types/stage-options.type';
 
 export class UpdateStageDto {
@@ -70,7 +70,6 @@ export class UpdateStageDto {
           playerCount: 16,          // 16명 참가
           seeding: {
             type: 'group_rank',     // 조별 순위 기반 시드 배정
-            groupRankWeights: [1, 0.7, 0.5, 0.3] // 조별 순위별 가중치
           }
         },
         description: '본선 단계 설정 예시',

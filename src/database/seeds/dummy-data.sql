@@ -49,8 +49,9 @@ INSERT INTO league_operator (league_id, user_id)
 SELECT 1, id FROM user WHERE userId IN ('operator1', 'operator2');
 
 -- 리그 참가자 더미데이터 (16명)
-INSERT INTO league_participant (league_id, user_id, status, skilllevel)
+INSERT INTO league_participant (id, league_id, user_id, status, skilllevel)
 SELECT 
+  id, -- 명시적으로 id 지정
   1, 
   id, 
   'APPROVED',

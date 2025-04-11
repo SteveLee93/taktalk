@@ -1,8 +1,8 @@
-import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query, Delete, UseInterceptors, ClassSerializerInterceptor } from '@nestjs/common';
+import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Patch } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { LeaguesService } from './leagues.service';
-import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto, ParticipateLeagueDto, SearchLeagueDto } from './dto/league.dto';
+import { CreateLeagueDto, AddOperatorDto, UpdateParticipantStatusDto, ParticipateLeagueDto, SearchLeagueDto, UpdateLeagueStatusDto } from './dto/league.dto';
 import { CreateLeagueTemplateDto, LeagueTemplateDto } from './dto/league-template.dto';
 import { League } from '../../entities/league.entity';
 
@@ -150,5 +150,21 @@ export class LeaguesController {
     @Request() req,
   ): Promise<void> {
     return this.leaguesService.removeOperator(id, operatorId, req.user.id);
+  }
+
+  @Patch(':id/status')
+  @ApiOperation({ summary: '리그 상태 변경' })
+  @ApiResponse({ status: 200, description: '상태 변경 성공' })
+  @UseGuards(JwtAuthGuard)
+  async updateLeagueStatus(
+    @Param('id') id: number,
+    @Body() updateLeagueStatusDto: UpdateLeagueStatusDto,
+    @Request() req,
+  ): Promise<void> {
+    return this.leaguesService.updateLeagueStatus(
+      id,
+      updateLeagueStatusDto,
+      req.user.id,
+    );
   }
 } 

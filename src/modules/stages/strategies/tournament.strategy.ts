@@ -6,7 +6,11 @@ import { Stage } from '../../../entities/stage.entity';
 import { Match, MatchStatus, PlayerOrigin } from '../../../entities/match.entity';
 import { User } from '../../../entities/user.entity';
 import { Group } from '../../../entities/group.entity';
-import { TournamentOptions, BracketType, StageType } from '../../../common/types/stage-options.type';
+import { TournamentOptions } from '../../../common/types/stage-options.type';
+import { StageType } from '../../../common/enums/stage-type.enum';
+import { LeagueParticipant } from '../../../entities/league-participant.entity';
+import { PlayerInGroup } from '../../../entities/player-in-group.entity';
+import { In } from 'typeorm';
 
 @Injectable()
 export class TournamentStageStrategy implements StageStrategy {
@@ -17,6 +21,8 @@ export class TournamentStageStrategy implements StageStrategy {
     private groupRepository: Repository<Group>,
     @InjectRepository(Stage)
     private stageRepository: Repository<Stage>,
+    @InjectRepository(LeagueParticipant)
+    private participantRepository: Repository<LeagueParticipant>,
   ) {}
 
   async createGroups(stage: Stage, players: User[]): Promise<void> {
@@ -134,8 +140,16 @@ export class TournamentStageStrategy implements StageStrategy {
   }
 
   async assignSeeds(stage: Stage): Promise<void> {
+    console.log('assignSeeds 시작 - 스테이지 ID:', stage.id);
+    
     // 1. 예선 순위에 따라 플레이어 배열 구성
     let rankedPlayers = await this.getRankedPlayersFromPreliminary(stage);
+    console.log('예선 순위별 플레이어:', rankedPlayers.map(p => ({
+      id: p.id,
+      userId: p.user.userId,
+      name: p.user.name
+    })));
+    
     if (!rankedPlayers.length) {
       console.log('시드 배정할 플레이어가 없습니다.');
       return;
@@ -160,12 +174,14 @@ export class TournamentStageStrategy implements StageStrategy {
       relations: ['player1', 'player2', 'nextMatch'],
       order: { round: 'DESC', order: 'ASC' }
     });
+    console.log('조회된 매치 수:', allMatches.length);
     
     // 4. 각 라운드별 매치 정리
     const matchesByRound: Match[][] = [];
     for (let i = 1; i <= requiredRounds; i++) {
       const roundMatches = allMatches.filter(match => match.round === i);
       matchesByRound.push(roundMatches);
+      console.log(`${i}라운드 매치 수:`, roundMatches.length);
     }
     
     // 5. 첫 라운드 매치 (가장 높은 라운드)
@@ -173,7 +189,8 @@ export class TournamentStageStrategy implements StageStrategy {
     console.log(`첫 라운드 매치 수: ${firstRoundMatches.length}`);
     
     // 6. 플레이어 출신 정보 가져오기
-    const playerOrigins = await this.getPlayerOrigins(stage, rankedPlayers.map(p => p.id));
+    const playerOrigins = await this.getPlayerOrigins(stage, rankedPlayers.map(p => p.user.id));
+    console.log('플레이어 출신 정보:', playerOrigins);
     
     // 7. 토너먼트 시드 배정 계획 작성
     const {
@@ -181,7 +198,20 @@ export class TournamentStageStrategy implements StageStrategy {
       matchesWithByes
     } = this.createTournamentSeedPlan(rankedPlayers, playerOrigins, firstRoundMatches.length);
     
-    console.log('매치 배정 계획:', matchAssignments);
+    console.log('매치 배정 계획:', matchAssignments.map((assignment, idx) => ({
+      matchIndex: idx,
+      player1: assignment.player1 ? {
+        id: assignment.player1.id,
+        userId: assignment.player1.user.userId,
+        name: assignment.player1.user.name
+      } : null,
+      player2: assignment.player2 ? {
+        id: assignment.player2.id,
+        userId: assignment.player2.user.userId,
+        name: assignment.player2.user.name
+      } : null,
+      isBye: assignment.isBye
+    })));
     console.log('부전승 매치 수:', matchesWithByes.length);
     
     // 8. 계획에 따라 실제 매치에 선수 배정
@@ -191,20 +221,38 @@ export class TournamentStageStrategy implements StageStrategy {
       const match = firstRoundMatches[i];
       const assignment = matchAssignments[i];
       
-      if (!assignment) continue;
+      if (!assignment) {
+        console.log(`매치 ${i}에 대한 배정 정보가 없습니다.`);
+        continue;
+      }
+      
+      console.log(`매치 ${i} 배정 처리 중:`, {
+        matchId: match.id,
+        player1: assignment.player1 ? `${assignment.player1.user.name} (${assignment.player1.id})` : 'none',
+        player2: assignment.player2 ? `${assignment.player2.user.name} (${assignment.player2.id})` : 'none',
+        isBye: assignment.isBye
+      });
       
       // 플레이어 1 배정
       if (assignment.player1) {
-        match.player1 = { id: assignment.player1.id } as User;
+        match.player1 = assignment.player1;
         match.player1Origin = assignment.player1Origin;
-        console.log(`매치 ${match.id} player1: ${assignment.player1.id}`);
+        console.log(`매치 ${match.id} player1 배정:`, {
+          id: assignment.player1.id,
+          name: assignment.player1.user.name,
+          origin: assignment.player1Origin
+        });
       }
       
       // 플레이어 2 배정
       if (assignment.player2) {
-        match.player2 = { id: assignment.player2.id } as User;
+        match.player2 = assignment.player2;
         match.player2Origin = assignment.player2Origin;
-        console.log(`매치 ${match.id} player2: ${assignment.player2.id}`);
+        console.log(`매치 ${match.id} player2 배정:`, {
+          id: assignment.player2.id,
+          name: assignment.player2.user.name,
+          origin: assignment.player2Origin
+        });
       }
       
       // 부전승 처리
@@ -220,8 +268,14 @@ export class TournamentStageStrategy implements StageStrategy {
     
     // 9. 첫 라운드 매치 저장
     if (processedMatches.length > 0) {
-      await this.matchRepository.save(processedMatches);
-      console.log(`${processedMatches.length}개의 첫 라운드 매치 저장 완료`);
+      console.log(`${processedMatches.length}개의 첫 라운드 매치 저장 시작`);
+      const savedMatches = await this.matchRepository.save(processedMatches);
+      console.log('저장된 매치:', savedMatches.map(m => ({
+        id: m.id,
+        player1: m.player1 ? `${m.player1.user.name} (${m.player1.id})` : 'none',
+        player2: m.player2 ? `${m.player2.user.name} (${m.player2.id})` : 'none',
+        status: m.status
+      })));
     }
     
     // 10. 부전승으로 인한 다음 라운드 진출 처리
@@ -229,21 +283,27 @@ export class TournamentStageStrategy implements StageStrategy {
     
     // 11. 다음 라운드 매치 저장
     if (nextRoundMatches.length > 0) {
-      await this.matchRepository.save(nextRoundMatches);
-      console.log(`부전승으로 인한 ${nextRoundMatches.length}개의 다음 라운드 매치 업데이트 완료`);
+      console.log(`부전승으로 인한 ${nextRoundMatches.length}개의 다음 라운드 매치 업데이트 시작`);
+      const savedNextMatches = await this.matchRepository.save(nextRoundMatches);
+      console.log('업데이트된 다음 라운드 매치:', savedNextMatches.map(m => ({
+        id: m.id,
+        player1: m.player1 ? `${m.player1.user.name} (${m.player1.id})` : 'none',
+        player2: m.player2 ? `${m.player2.user.name} (${m.player2.id})` : 'none',
+        status: m.status
+      })));
     }
   }
   
   // 토너먼트 시드 배정 계획 생성
   private createTournamentSeedPlan(
-    players: User[],
+    players: LeagueParticipant[],
     playerOrigins: Record<number, PlayerOrigin>,
     matchCount: number
   ): {
     matchAssignments: {
-      player1?: User;
+      player1?: LeagueParticipant;
       player1Origin?: PlayerOrigin;
-      player2?: User;
+      player2?: LeagueParticipant;
       player2Origin?: PlayerOrigin;
       isBye: boolean;
     }[];
@@ -259,9 +319,9 @@ export class TournamentStageStrategy implements StageStrategy {
     
     // 결과 배열 초기화
     const matchAssignments: {
-      player1?: User;
+      player1?: LeagueParticipant;
       player1Origin?: PlayerOrigin;
-      player2?: User;
+      player2?: LeagueParticipant;
       player2Origin?: PlayerOrigin;
       isBye: boolean;
     }[] = [];
@@ -274,7 +334,7 @@ export class TournamentStageStrategy implements StageStrategy {
       rank: number;
       groupId: number;
       groupName: string;
-      player: User;
+      player: LeagueParticipant;
       origin: PlayerOrigin;
     }[][] = [];
     
@@ -295,25 +355,25 @@ export class TournamentStageStrategy implements StageStrategy {
     // 분류 전에 모든 플레이어 원본 확인
     console.log(`분류 전 전체 플레이어 수: ${players.length}명`);
     players.forEach(p => {
-      const origin = playerOrigins[p.id];
-      console.log(`플레이어 ID ${p.id}, 이름: ${p.name}, 랭크: ${origin?.rank || '없음'}, 그룹: ${origin?.groupId || '없음'}`);
+      const origin = playerOrigins[p.user.id];
+      console.log(`플레이어 ID ${p.user.id}, 이름: ${p.user.name}, 랭크: ${origin?.rank || '없음'}, 그룹: ${origin?.groupId || '없음'}`);
     });
 
     // 플레이어 정보 분류
     let classifiedCount = 0;
     for (const player of players) {
-      const origin = playerOrigins[player.id];
+      const origin = playerOrigins[player.user.id];
       if (!origin || origin.groupId === undefined) {
-        console.error(`오류: 플레이어 ID ${player.id}, 이름: ${player.name}의 소속 그룹 정보가 없습니다.`);
+        console.error(`오류: 플레이어 ID ${player.user.id}, 이름: ${player.user.name}의 소속 그룹 정보가 없습니다.`);
         continue;
       }
 
       const rank = origin.rank || 1;
-      console.log(`플레이어 ${player.name} (ID: ${player.id}) 분류 중: 랭크=${rank}, 범위 체크=${rank >= minRank && rank <= maxRank}`);
+      console.log(`플레이어 ${player.user.name} (ID: ${player.user.id}) 분류 중: 랭크=${rank}, 범위 체크=${rank >= minRank && rank <= maxRank}`);
 
       // 지정된 랭크 범위 내에 있는지 확인
       if (rank >= minRank && rank <= maxRank) {
-        const rankIndex = rank - minRank; // 0-indexed로 변환
+        const rankIndex = rank - minRank;
 
         if (rankIndex >= 0 && rankIndex < rankGroups.length) {
           rankGroups[rankIndex].push({
@@ -328,7 +388,7 @@ export class TournamentStageStrategy implements StageStrategy {
           console.error(`오류: 랭크 인덱스(${rankIndex})가 범위를 벗어납니다 (0-${rankGroups.length - 1})`);
         }
       } else {
-        console.log(`제외됨: 플레이어 ${player.name}(랭크 ${rank})는 범위(${minRank}-${maxRank}) 밖입니다.`);
+        console.log(`제외됨: 플레이어 ${player.user.name}(랭크 ${rank})는 범위(${minRank}-${maxRank}) 밖입니다.`);
       }
     }
 
@@ -341,7 +401,7 @@ export class TournamentStageStrategy implements StageStrategy {
     }
     
     // 2. 토너먼트 시드 번호 할당 (1,2,3,4... 순서로)
-    const seedMap: Map<number, User | null> = new Map();
+    const seedMap: Map<number, LeagueParticipant | null> = new Map();
     const seedToOrigin: Map<number, PlayerOrigin> = new Map();
     
     // 각 랭크별로 시드 배정 (지정된 랭크 순서로)
@@ -357,7 +417,7 @@ export class TournamentStageStrategy implements StageStrategy {
         const seedNumber = nextSeed++;
         seedMap.set(seedNumber, playersInRank[i].player);
         seedToOrigin.set(seedNumber, playersInRank[i].origin);
-        console.log(`시드 ${seedNumber}: ${playersInRank[i].groupName} ${playersInRank[i].rank}등 (ID: ${playersInRank[i].player.id})`);
+        console.log(`시드 ${seedNumber}: ${playersInRank[i].groupName} ${playersInRank[i].rank}등 (ID: ${playersInRank[i].player.user.id})`);
       }
     }
     
@@ -367,7 +427,7 @@ export class TournamentStageStrategy implements StageStrategy {
       console.log(`시드 ${i}: 가상 선수`);
     }
     
-    // 3. 토너먼트 매치 패턴 생성 (토너먼트 크기에 따라 적절한 패턴 생성)
+    // 3. 토너먼트 매치 패턴 생성
     const orderedMatches = this.generateTournamentMatchPattern(tournamentSize, matchCount);
     console.log("생성된 매치 패턴:", orderedMatches);
     
@@ -404,11 +464,11 @@ export class TournamentStageStrategy implements StageStrategy {
       let player2Info = '가상 선수';
       
       if (player1) {
-        player1Info = `시드 ${seed1}: ${player1Origin?.groupName} ${player1Origin?.rank}등 (ID: ${player1.id})`;
+        player1Info = `시드 ${seed1}: ${player1Origin?.groupName} ${player1Origin?.rank}등 (ID: ${player1.user.id})`;
       }
       
       if (player2) {
-        player2Info = `시드 ${seed2}: ${player2Origin?.groupName} ${player2Origin?.rank}등 (ID: ${player2.id})`;
+        player2Info = `시드 ${seed2}: ${player2Origin?.groupName} ${player2Origin?.rank}등 (ID: ${player2.user.id})`;
       }
       
       console.log(`매치 ${matchIndex + 1} (${seed1} vs ${seed2}): ${player1Info} vs ${player2Info} ${isBye ? '(부전승)' : ''}`);
@@ -504,32 +564,53 @@ export class TournamentStageStrategy implements StageStrategy {
   }
 
   // 중복 플레이어 제거
-  private getUniquePlayers(players: User[]): User[] {
-    const uniquePlayerMap = new Map<number, User>();
+  private getUniquePlayers(players: LeagueParticipant[]): LeagueParticipant[] {
+    const uniquePlayerMap = new Map<number, LeagueParticipant>();
     
     for (const player of players) {
-      if (!uniquePlayerMap.has(player.id)) {
-        uniquePlayerMap.set(player.id, player);
+      if (!uniquePlayerMap.has(player.user.id)) {
+        uniquePlayerMap.set(player.user.id, player);
       }
     }
     
     return Array.from(uniquePlayerMap.values());
   }
 
-  private async getRankedPlayersFromPreliminary(stage: Stage): Promise<User[]> {
+  private async getRankedPlayersFromPreliminary(stage: Stage): Promise<LeagueParticipant[]> {
+    console.log('getRankedPlayersFromPreliminary 시작 - 스테이지 ID:', stage.id);
+    
     const previousStage = await this.getPreviousStage(stage);
     if (!previousStage) {
       console.error(`이전 스테이지를 찾을 수 없습니다. (스테이지 ID: ${stage.id})`);
       return [];
     }
 
-    console.log(`이전 스테이지: ID ${previousStage.id}, 이름: ${previousStage.name}, 타입: ${previousStage.type}`);
+    console.log(`이전 스테이지 정보:`, {
+      id: previousStage.id,
+      name: previousStage.name,
+      type: previousStage.type,
+      leagueId: previousStage.league?.id
+    });
 
     // 예선 그룹 조회
     let groups = await this.groupRepository.find({
       where: { stage: { id: previousStage.id } },
-      relations: ['players', 'players.user'],
+      relations: ['players', 'players.user', 'stage', 'stage.league'],
       order: { number: 'ASC' }, // 조 번호 순서대로 정렬
+    });
+
+    console.log(`조회된 그룹 수: ${groups.length}`);
+    groups.forEach(group => {
+      console.log(`그룹 ${group.number} 정보:`, {
+        id: group.id,
+        name: group.name,
+        playerCount: group.players.length,
+        players: group.players.map(p => ({
+          id: p.user.id,
+          name: p.user.name,
+          rank: p.rank
+        }))
+      });
     });
 
     // 그룹이 없으면 디버깅 정보 추가
@@ -537,20 +618,18 @@ export class TournamentStageStrategy implements StageStrategy {
       console.error(`스테이지 ${previousStage.id}에서 그룹을 찾을 수 없습니다.`);
 
       // 직접 스테이지 ID로 그룹 찾기 시도
-      const allGroups = await this.groupRepository.find();
+      const allGroups = await this.groupRepository.find({
+        relations: ['players', 'players.user', 'stage', 'stage.league'],
+      });
       console.log(`전체 그룹 수: ${allGroups.length}`);
+      console.log('전체 그룹 목록:', allGroups.map(g => ({
+        id: g.id,
+        name: g.name,
+        stageId: g.stage?.id,
+        playerCount: g.players.length
+      })));
       
-      groups = await this.groupRepository.find({
-        relations: ['players', 'players.user', 'stage'],
-      });
-      
-      console.log('그룹 목록:');
-      groups.forEach(g => {
-        console.log(`그룹 ID: ${g.id}, 이름: ${g.name}, 스테이지 ID: ${g.stage?.id}`);
-      });
-      
-      // 다시 정확한 그룹만 필터링
-      groups = groups.filter(g => g.stage?.id === previousStage.id);
+      groups = allGroups.filter(g => g.stage?.id === previousStage.id);
       
       if (groups.length === 0) {
         console.error('이전 스테이지에 해당하는 그룹을 찾지 못했습니다.');
@@ -559,29 +638,30 @@ export class TournamentStageStrategy implements StageStrategy {
     }
 
     const options = stage.options as TournamentOptions;
-    const { rankCutoff, minRank = 1, maxRank } = options.seeding.qualificationCriteria;
+    const qualificationCriteria = options.seeding.qualificationCriteria || { rankCutoff: 2, minRank: 1 };
+    const { rankCutoff = 2, minRank = 1, maxRank } = qualificationCriteria;
     
     // 최종 랭크 범위 결정
     const effectiveMaxRank = maxRank || rankCutoff;
     const effectiveMinRank = minRank || 1;
     
-    console.log(`예선 그룹 수: ${groups.length}, 랭크 범위: ${effectiveMinRank}-${effectiveMaxRank}`);
+    console.log(`랭크 설정:`, {
+      rankCutoff,
+      minRank,
+      maxRank,
+      effectiveMinRank,
+      effectiveMaxRank
+    });
     
     // 각 조별 랭킹 수집 및 가공
-    const playersByRank: User[][] = [];
+    const playersByRank: LeagueParticipant[][] = [];
     for (let i = 0; i < (effectiveMaxRank - effectiveMinRank + 1); i++) {
       playersByRank.push([]);
     }
     
     // 각 조별로 플레이어 순위 계산 및 분류
     for (const group of groups) {
-      console.log(`그룹 ${group.number} 처리 중...`);
-      console.log(`플레이어 수: ${group.players.length}`);
-      
-      // 플레이어 rank 로그 출력
-      group.players.forEach(p => {
-        console.log(`플레이어 ${p.user.name} (ID: ${p.user.id}), 랭크: ${p.rank}`);
-      });
+      console.log(`그룹 ${group.number} 처리 시작`);
       
       const rankedPlayers = await this.getRankedPlayersInGroup(group);
       console.log(`${group.number}조 전체 플레이어 수: ${rankedPlayers.length}명`);
@@ -590,12 +670,15 @@ export class TournamentStageStrategy implements StageStrategy {
       for (let rank = effectiveMinRank - 1; rank < effectiveMaxRank && rank < rankedPlayers.length; rank++) {
         const rankIndex = rank - (effectiveMinRank - 1); // 0부터 시작하는 배열 인덱스 계산
         
-        console.log(`플레이어 랭크 처리: 실제 랭크=${rank+1}, 배열 인덱스=${rankIndex}`);
-        
         if (rankedPlayers[rank]) {
           if (rankIndex >= 0 && rankIndex < playersByRank.length) {
             playersByRank[rankIndex].push(rankedPlayers[rank]);
-            console.log(`${group.number}조 ${rank+1}등 플레이어 추가: ID ${rankedPlayers[rank].id}, 이름: ${rankedPlayers[rank].name}, 배열 인덱스 ${rankIndex}`);
+            console.log(`${group.number}조 ${rank+1}등 플레이어 추가:`, {
+              id: rankedPlayers[rank].id,
+              userId: rankedPlayers[rank].user.userId,
+              name: rankedPlayers[rank].user.name,
+              rankIndex
+            });
           } else {
             console.error(`오류: 배열 인덱스(${rankIndex})가 범위를 벗어남 (0-${playersByRank.length-1})`);
           }
@@ -606,10 +689,9 @@ export class TournamentStageStrategy implements StageStrategy {
     }
     
     // 최종 시드 배정 결과 배열
-    const seededPlayers: User[] = [];
+    const seededPlayers: LeagueParticipant[] = [];
     
     // 시드 순서대로 플레이어 배열 구성
-    // 모든 등수별로 플레이어 수집 (1등부터 rankCutoff등까지)
     for (let rank = 0; rank < playersByRank.length; rank++) {
       if (playersByRank[rank]?.length > 0) {
         console.log(`${rank+effectiveMinRank}등 플레이어 ${playersByRank[rank].length}명 시드 배정`);
@@ -620,12 +702,12 @@ export class TournamentStageStrategy implements StageStrategy {
     }
     
     // 최종 시드 배열 로그
-    console.log(`최종 시드 배열: ${seededPlayers.length}명`);
-    for (let i = 0; i < seededPlayers.length; i++) {
-      const player = seededPlayers[i];
-      const origin = player ? this.getPlayerOriginFromGroups(player.id, groups) : null;
-      console.log(`Seed ${i + 1}: Player ID ${player?.id || 'unknown'}, 이름: ${player?.name}, ${origin ? `${origin.groupName} ${origin.rank}등` : 'unknown origin'}`);
-    }
+    console.log(`최종 시드 배열 (${seededPlayers.length}명):`, seededPlayers.map((p, i) => ({
+      seedNumber: i + 1,
+      id: p.id,
+      userId: p.user.userId,
+      name: p.user.name
+    })));
     
     return seededPlayers;
   }
@@ -660,12 +742,12 @@ export class TournamentStageStrategy implements StageStrategy {
       const rankedPlayers = await this.getRankedPlayersInGroup(group);
       
       rankedPlayers.forEach((player, index) => {
-        if (playerIds.includes(player.id)) {
-          origins[player.id] = {
+        if (playerIds.includes(player.user.id)) {
+          origins[player.user.id] = {
             groupId: group.id,
             groupName: `${group.number}조`,
             rank: index + 1,
-            seed: `${group.number}-${index + 1}` // 조-순위 형식 유지 (예: "1-1", "2-1")
+            seed: `${group.number}-${index + 1}`
           };
         }
       });
@@ -674,50 +756,90 @@ export class TournamentStageStrategy implements StageStrategy {
     return origins;
   }
 
-  private async getRankedPlayersInGroup(group: Group): Promise<User[]> {
+  private async getRankedPlayersInGroup(group: Group): Promise<LeagueParticipant[]> {
     // PlayerInGroup의 rank 필드를 사용하여 정렬
     console.log(`${group.number}조 순위 계산 방식: PlayerInGroup의 rank 필드 사용`);
     
     // rank 필드로 정렬된 플레이어 목록 반환
     const playersByRank = [...group.players].sort((a, b) => a.rank - b.rank);
     
-    // 로그 출력
-    playersByRank.forEach(player => {
-      console.log(`${group.number}조 ${player.rank}등: ${player.user.name} (ID: ${player.user.id})`);
+    // 각 PlayerInGroup을 LeagueParticipant로 변환
+    const participants = await this.participantRepository.find({
+      where: {
+        user: { id: In(playersByRank.map(p => p.user.id)) },
+        league: { id: group.stage.league.id }
+      }
     });
     
-    return playersByRank.map(p => p.user);
+    // PlayerInGroup의 순서를 유지하면서 LeagueParticipant 매핑
+    const sortedParticipants = playersByRank.map(pig => 
+      participants.find(p => p.user.id === pig.user.id)
+    ).filter((p): p is LeagueParticipant => p !== undefined);
+    
+    // 로그 출력
+    sortedParticipants.forEach((participant, index) => {
+      console.log(`${group.number}조 ${index + 1}등: ${participant.user.name} (ID: ${participant.user.id})`);
+    });
+    
+    return sortedParticipants;
   }
 
   private async getPreviousStage(stage: Stage): Promise<Stage | null> {
+    console.log('getPreviousStage 시작:', {
+      currentStageId: stage.id,
+      currentStageType: stage.type,
+      leagueId: stage.league?.id
+    });
+    
     // 토너먼트 타입이면 예선(GROUP) 스테이지를 찾음
     if (stage.type === StageType.TOURNAMENT) {
-      return await this.stageRepository.findOne({
+      const groupStage = await this.stageRepository.findOne({
         where: {
           league: { id: stage.league.id },
           type: StageType.GROUP
         },
+        relations: ['league']
       });
+      
+      console.log('예선 스테이지 조회 결과:', groupStage ? {
+        id: groupStage.id,
+        name: groupStage.name,
+        type: groupStage.type,
+        leagueId: groupStage.league?.id
+      } : 'not found');
+      
+      return groupStage;
     }
     
     // 기존 로직 (order 기반)
-    return await this.stageRepository.findOne({
+    const previousStage = await this.stageRepository.findOne({
       where: {
         league: { id: stage.league.id },
         order: stage.order - 1,
       },
+      relations: ['league']
     });
+    
+    console.log('이전 스테이지 조회 결과 (order 기반):', previousStage ? {
+      id: previousStage.id,
+      name: previousStage.name,
+      type: previousStage.type,
+      order: previousStage.order,
+      leagueId: previousStage.league?.id
+    } : 'not found');
+    
+    return previousStage;
   }
 
   async getAdvancingPlayers(stage: Stage): Promise<User[]> {
     // 토너먼트의 경우 결승전 승자가 우승자
     const finalMatch = await this.matchRepository.findOne({
       where: { stage: { id: stage.id } },
-      relations: ['result', 'result.winner'],
+      relations: ['result', 'result.winner', 'result.winner.user'],
       order: { id: 'DESC' },
     });
 
-    return finalMatch?.result?.winner ? [finalMatch.result.winner] : [];
+    return finalMatch?.result?.winner ? [finalMatch.result.winner.user] : [];
   }
 
   async updateMatchResult(match: Match, winnerId: number): Promise<void> {
@@ -740,9 +862,16 @@ export class TournamentStageStrategy implements StageStrategy {
       });
 
       if (nextMatch) {
-        const winner = { id: winnerId } as User;
+        // 승자의 LeagueParticipant 정보 가져오기
+        const winner = match.player1?.user.id === winnerId ? match.player1 : match.player2;
+        
+        if (!winner) {
+          console.error(`승자(ID: ${winnerId})의 참가자 정보를 찾을 수 없습니다.`);
+          return;
+        }
+        
         // 승자의 출신 정보(Origin) 복사
-        const winnerOrigin = match.player1?.id === winnerId ? match.player1Origin : match.player2Origin;
+        const winnerOrigin = match.player1?.user.id === winnerId ? match.player1Origin : match.player2Origin;
         
         console.log(`다음 매치 ${nextMatch.id}의 포지션: ${match.nextMatchPosition || '미설정'}`);
         
@@ -805,7 +934,8 @@ export class TournamentStageStrategy implements StageStrategy {
     });
 
     const options = stage.options as TournamentOptions;
-    const { rankCutoff } = options.seeding.qualificationCriteria;
+    const qualificationCriteria = options.seeding.qualificationCriteria || { rankCutoff: 2 };
+    const { rankCutoff = 2 } = qualificationCriteria;
     
     // 각 조별 진출자 수를 합산
     let totalPlayerCount = 0;
@@ -824,20 +954,15 @@ export class TournamentStageStrategy implements StageStrategy {
     allMatches: Match[],
     byeMatchIndices: number[]
   ): Promise<Match[]> {
-    // 변경된 다음 라운드 매치들
     const updatedNextMatches: Match[] = [];
-    
-    // 다음 라운드 매치 매핑
     const nextMatchMap = new Map<number, Match>();
     
-    // 다음 라운드 매치 정보 구성
     for (const match of allMatches) {
       if (match.nextMatch) {
         nextMatchMap.set(match.nextMatch.id, match.nextMatch);
       }
     }
     
-    // 부전승 매치 처리 - 모든 매치 확인
     const byeMatches = allMatches.filter(match => 
       match.status === MatchStatus.BYE || 
       (!match.player1 && match.player2) || 
@@ -846,13 +971,11 @@ export class TournamentStageStrategy implements StageStrategy {
     console.log(`부전승 매치 찾기: ${byeMatches.length}개 발견`);
     
     for (const byeMatch of byeMatches) {
-      // 매치를 부전승 상태로 표시
       byeMatch.status = MatchStatus.BYE;
       
       if (!byeMatch.nextMatch) continue;
       
-      // 승자 결정 (실제 선수만)
-      let winner: User | undefined = undefined;
+      let winner: LeagueParticipant | undefined = undefined;
       let winnerOrigin: PlayerOrigin | undefined = undefined;
       
       if (byeMatch.player1 && !byeMatch.player2) {
@@ -862,26 +985,22 @@ export class TournamentStageStrategy implements StageStrategy {
         winner = byeMatch.player2;
         winnerOrigin = byeMatch.player2Origin;
       } else {
-        // 둘 다 있거나 둘 다 없는 경우는 건너뛰기
         continue;
       }
       
-      // 다음 라운드 매치 찾기
       const nextMatch = nextMatchMap.get(byeMatch.nextMatch.id);
-      if (!nextMatch) continue;
+      if (!nextMatch || !winner) continue;
       
-      // 승자를 다음 라운드에 배정
       if (byeMatch.nextMatchPosition === 1) {
-        nextMatch.player1 = { id: winner.id } as User;
+        nextMatch.player1 = winner;
         nextMatch.player1Origin = winnerOrigin;
       } else {
-        nextMatch.player2 = { id: winner.id } as User;
+        nextMatch.player2 = winner;
         nextMatch.player2Origin = winnerOrigin;
       }
       
       console.log(`부전승: ${winner.id}가 매치 ${nextMatch.id}로 자동 진출`);
       
-      // 변경된 매치 추가 (부전승 매치와 다음 라운드 매치)
       if (!updatedNextMatches.includes(byeMatch)) {
         updatedNextMatches.push(byeMatch);
       }
@@ -891,11 +1010,9 @@ export class TournamentStageStrategy implements StageStrategy {
       }
     }
     
-    // byeMatchIndices를 기반으로 추가적인 첫 라운드 매치 처리
     for (let i = 0; i < byeMatchIndices.length; i++) {
       const matchIndex = byeMatchIndices[i];
       
-      // 첫 라운드 매치 찾기
       const firstRoundMatches = allMatches.filter(match => 
         Math.log2(allMatches.length) === match.round);
       
@@ -905,14 +1022,11 @@ export class TournamentStageStrategy implements StageStrategy {
       
       if (!byeMatch || !byeMatch.nextMatch || byeMatch.status === MatchStatus.BYE) continue;
       
-      // 이미 위에서 처리했으면 건너뛰기
       if (updatedNextMatches.includes(byeMatch)) continue;
       
-      // 상태가 BYE가 아니라면 설정
       byeMatch.status = MatchStatus.BYE;
       
-      // 승자 결정 (player1이 있으면 player1, 없으면 player2)
-      let winner: User | undefined = undefined;
+      let winner: LeagueParticipant | undefined = undefined;
       let winnerOrigin: PlayerOrigin | undefined = undefined;
       
       if (byeMatch.player1) {
@@ -925,22 +1039,19 @@ export class TournamentStageStrategy implements StageStrategy {
         continue;
       }
       
-      // 다음 라운드 매치 찾기
       const nextMatch = nextMatchMap.get(byeMatch.nextMatch.id);
-      if (!nextMatch) continue;
+      if (!nextMatch || !winner) continue;
       
-      // 승자를 다음 라운드에 배정
       if (byeMatch.nextMatchPosition === 1) {
-        nextMatch.player1 = { id: winner.id } as User;
+        nextMatch.player1 = winner;
         nextMatch.player1Origin = winnerOrigin;
       } else {
-        nextMatch.player2 = { id: winner.id } as User;
+        nextMatch.player2 = winner;
         nextMatch.player2Origin = winnerOrigin;
       }
       
       console.log(`부전승(인덱스): ${winner.id}가 매치 ${nextMatch.id}로 자동 진출`);
       
-      // 변경된 매치 추가 (부전승 매치와 다음 라운드 매치)
       updatedNextMatches.push(byeMatch);
       
       if (!updatedNextMatches.includes(nextMatch)) {

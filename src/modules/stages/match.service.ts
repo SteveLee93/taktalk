@@ -6,7 +6,7 @@ import { TournamentStageStrategy } from './strategies/tournament.strategy';
 import { GroupStageStrategy } from './strategies/group-stage.strategy';
 import { Stage } from '../../entities/stage.entity';
 import { UpdateMatchResultDto } from './dto/match.dto';
-import { StageType } from '../../common/types/stage-options.type';
+import { StageType } from '../../common/enums/stage-type.enum';
 import { MatchResult } from '../../entities/match-result.entity';
 import { User } from '../../entities/user.entity';
 

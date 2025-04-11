@@ -5,6 +5,7 @@ import { LeagueParticipant } from './league-participant.entity';
 import { User } from './user.entity';
 import { Stage } from './stage.entity';
 import { SkillLevel } from '../common/enums/skill-level.enum';
+import { LeagueStatus } from '../common/enums/league-status.enum';
 
 @Entity()
 export class League {
@@ -52,6 +53,19 @@ export class League {
   @ApiProperty({ description: '리그 설명' })
   @Column('text')
   description: string;
+
+  @ApiProperty({ 
+    description: '리그 상태', 
+    enum: LeagueStatus,
+    example: LeagueStatus.RECRUITING,
+    default: LeagueStatus.RECRUITING
+  })
+  @Column({
+    type: 'enum',
+    enum: LeagueStatus,
+    default: LeagueStatus.RECRUITING
+  })
+  status: LeagueStatus;
 
   @ApiProperty({ description: '최소 실력 수준', enum: SkillLevel })
   @Column({

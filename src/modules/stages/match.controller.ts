@@ -36,8 +36,51 @@ export class MatchController {
     @Param('id') id: number,
     @Body() updateMatchResultDto: UpdateMatchResultDto,
   ): Promise<MatchResponseDto> {
+    console.log(`매치 ${id} 결과 업데이트 API 호출`);
+    
+    // 업데이트 전 매치 및 그룹 정보 조회
+    const beforeMatch = await this.matchService.getMatch(id);
+    if (beforeMatch.group) {
+      const groupId = beforeMatch.group.id;
+      console.log(`매치가 속한 그룹 ID: ${groupId}`);
+      
+      // 그룹 내 플레이어 정보 조회
+      const group = await this.stagesService['groupRepository'].findOne({
+        where: { id: groupId },
+        relations: ['players', 'players.user'],
+      });
+      
+      if (group) {
+        console.log(`업데이트 전 그룹 ${groupId} 플레이어 정보 (${group.players.length}명):`);
+        group.players.forEach(player => {
+          console.log(`ID: ${player.id}, 사용자: ${player.user.name}(${player.user.id}), 순위: ${player.rank}`);
+        });
+      }
+    }
+    
+    // 결과 업데이트
     await this.stagesService.updateMatchResult(id, updateMatchResultDto);
+    
+    // 업데이트 후 매치 및 그룹 정보 조회
     const match = await this.matchService.getMatch(id);
+    
+    if (match.group) {
+      const groupId = match.group.id;
+      
+      // 그룹 내 플레이어 정보 다시 조회
+      const group = await this.stagesService['groupRepository'].findOne({
+        where: { id: groupId },
+        relations: ['players', 'players.user'],
+      });
+      
+      if (group) {
+        console.log(`업데이트 후 그룹 ${groupId} 플레이어 정보 (${group.players.length}명):`);
+        group.players.forEach(player => {
+          console.log(`ID: ${player.id}, 사용자: ${player.user.name}(${player.user.id}), 순위: ${player.rank}`);
+        });
+      }
+    }
+    
     return this.toMatchResponse(match);
   }
 

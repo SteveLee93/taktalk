@@ -12,7 +12,8 @@ import { MatchController } from './match.controller';
 import { MatchService } from './match.service';
 import { GroupStageStrategy } from './strategies/group-stage.strategy';
 import { TournamentStageStrategy } from './strategies/tournament.strategy';
-import { LeaguesModule } from '../leagues/leagues.module';
+import { League } from '../../entities/league.entity';
+import { LeagueParticipant } from '../../entities/league-participant.entity';
 
 @Module({
   imports: [
@@ -23,8 +24,9 @@ import { LeaguesModule } from '../leagues/leagues.module';
       PlayerInGroup,
       MatchResult,
       User,
+      League,
+      LeagueParticipant,
     ]),
-    LeaguesModule,
   ],
   controllers: [StagesController, MatchController],
   providers: [StagesService, MatchService, GroupStageStrategy, TournamentStageStrategy],

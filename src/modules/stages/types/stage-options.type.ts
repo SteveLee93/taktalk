@@ -1,4 +1,5 @@
-import { StageType } from '../enums/stage-type.enum';
+import { MatchFormat } from './match-format.enum';
+import { StageType } from './stage-type.enum';
 
 export interface MatchFormatOptions {
   gamesRequired: number;
@@ -16,14 +17,6 @@ export interface GroupStageOptions extends BaseStageOptions {
   groupCount: number;
   playersPerGroup: number;
   advancingPlayersCount: number;
-  seeding?: {
-    type: SeedingType;
-    qualificationCriteria?: {
-      rankCutoff?: number;
-      minRank?: number;
-      maxRank?: number;
-    };
-  };
 }
 
 export interface TournamentOptions extends BaseStageOptions {

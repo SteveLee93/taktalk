@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToOne, JoinColumn
 import { ApiProperty } from '@nestjs/swagger';
 import { Stage } from './stage.entity';
 import { Group } from './group.entity';
-import { User } from './user.entity';
+import { LeagueParticipant } from './league-participant.entity';
 import { MatchResult } from './match-result.entity';
 
 export enum MatchStatus {
@@ -36,15 +36,15 @@ export class Match {
   @JoinColumn({ name: 'group_id' })
   group?: Group;
 
-  @ApiProperty({ description: '플레이어 1', type: () => User })
-  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @ApiProperty({ description: '플레이어 1', type: () => LeagueParticipant })
+  @ManyToOne(() => LeagueParticipant, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'player1_id' })
-  player1: User;
+  player1: LeagueParticipant;
 
-  @ApiProperty({ description: '플레이어 2', type: () => User })
-  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @ApiProperty({ description: '플레이어 2', type: () => LeagueParticipant })
+  @ManyToOne(() => LeagueParticipant, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'player2_id' })
-  player2: User;
+  player2: LeagueParticipant;
 
   @ApiProperty({ description: '플레이어 1 출신 정보 (예선 조/순위/시드)' })
   @Column('json', { nullable: true })

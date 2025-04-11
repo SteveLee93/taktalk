@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { League } from './league.entity';
-import { StageType } from '../common/types/stage-options.type';
+import { StageType } from '../common/enums/stage-type.enum';
 import { Group } from './group.entity';
 import { Match } from './match.entity';
 import { GroupStageOptions, TournamentOptions } from '../common/types/stage-options.type';

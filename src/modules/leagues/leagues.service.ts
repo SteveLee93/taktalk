@@ -11,7 +11,7 @@ import { CreateLeagueTemplateDto, LeagueTemplateDto } from './dto/league-templat
 import { LeagueStatus } from '../../common/enums/league-status.enum';
 import { StagesService } from '../stages/stages.service';
 import { StageType } from '../../common/enums/stage-type.enum';
-import { BracketType, SeedingType } from '../../common/types/stage-options.type';
+import { SeedingType } from '../../common/types/stage-options.type';
 
 @Injectable()
 export class LeaguesService {
@@ -72,7 +72,6 @@ export class LeaguesService {
           gamesRequired: 5,
           setsRequired: 3
         },
-        bracketType: 'SINGLE_ELIMINATION',
         seeding: {
           type: 'GROUP_RANK',
           qualificationCriteria: {
@@ -235,7 +234,8 @@ export class LeaguesService {
         'stages.matches.player1',
         'stages.matches.player2',
         'stages.matches.result',
-        'stages.matches.result.winner'
+        'stages.matches.result.winner',
+        'stages.matches.nextMatch'
       ],
       order: {
         stages: {
@@ -279,7 +279,9 @@ export class LeaguesService {
         'stages.matches.player1',
         'stages.matches.player2',
         'stages.matches.result',
-        'stages.matches.result.winner'
+        'stages.matches.result.winner',
+        'stages.matches.nextMatch'
+
       ],
       order: {
         stages: {

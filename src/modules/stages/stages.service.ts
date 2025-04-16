@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not } from 'typeorm';
+import { Repository, Not, MoreThan } from 'typeorm';
 import { Stage } from '../../entities/stage.entity';
 import { Match } from '../../entities/match.entity';
 import { MatchResult } from '../../entities/match-result.entity';
@@ -20,7 +20,7 @@ import { UpdateStageDto } from './dto/update-stage.dto';
 import { MatchService } from './match.service';
 import { ParticipantStatus } from '../../entities/league-participant.entity';
 import { LeagueParticipant } from '../../entities/league-participant.entity';
-import { BracketType, SeedingType } from '../../common/types/stage-options.type';
+import { SeedingType } from '../../common/types/stage-options.type';
 import { LeagueStatus } from '../../common/enums/league-status.enum';
 
 @Injectable()
@@ -106,6 +106,46 @@ export class StagesService {
       throw new NotFoundException('League not found');
     }
 
+    // 토너먼트 타입인 경우, 동일한 리그의 같거나 더 높은 order를 가진 모든 토너먼트 스테이지 삭제
+    if (dto.type === StageType.TOURNAMENT) {
+      console.log(`토너먼트 스테이지 생성: 리그 ID ${dto.leagueId}, order ${dto.order}의 기존 토너먼트 삭제 시작`);
+      
+      // 같거나 높은 order를 가진 모든 토너먼트 스테이지 조회
+      const stagesToDelete = await this.stageRepository.find({
+        where: {
+          league: { id: dto.leagueId },
+          type: StageType.TOURNAMENT,
+          order: dto.order // order가 동일하거나 더 높은 스테이지
+        },
+        relations: ['matches'],
+      });
+      
+      console.log(`삭제 대상 토너먼트 스테이지 수: ${stagesToDelete.length}개`);
+      
+      // 각 스테이지 삭제
+      for (const stage of stagesToDelete) {
+        console.log(`토너먼트 스테이지 ID ${stage.id}, order ${stage.order} 삭제 진행`);
+        await this.tournamentStageStrategy.deleteStage(stage.id);
+      }
+      
+      // 더 높은 order를 가진 토너먼트 스테이지 삭제
+      const higherOrderStages = await this.stageRepository.find({
+        where: {
+          league: { id: dto.leagueId },
+          type: StageType.TOURNAMENT,
+          order: MoreThan(dto.order)
+        },
+        relations: ['matches'],
+      });
+      
+      console.log(`더 높은 order의 토너먼트 스테이지 수: ${higherOrderStages.length}개`);
+      
+      for (const stage of higherOrderStages) {
+        console.log(`상위 order 토너먼트 스테이지 ID ${stage.id}, order ${stage.order} 삭제 진행`);
+        await this.tournamentStageStrategy.deleteStage(stage.id);
+      }
+    }
+
     // 동일한 leagueId와 order를 가진 Stage가 있는지 확인
     let stage = await this.stageRepository.findOne({
       where: { league: { id: dto.leagueId }, order: dto.order },
@@ -120,7 +160,6 @@ export class StagesService {
           gamesRequired: dto.options.matchFormat.gamesRequired,
           setsRequired: dto.options.matchFormat.setsRequired
         },
-        bracketType: 'SINGLE_ELIMINATION' as BracketType,
         seeding: {
           type: 'GROUP_RANK' as SeedingType,
           qualificationCriteria: {
@@ -144,18 +183,35 @@ export class StagesService {
     }
 
     if (stage) {
-      // 기존 Stage가 있는 경우, 관련된 groups와 matches를 모두 삭제
-      if (stage.groups?.length > 0) {
-        await this.groupRepository.remove(stage.groups);
-      }
-      if (stage.matches?.length > 0) {
-        await this.matchRepository.remove(stage.matches);
-      }
+      // 기존 Stage가 있는 경우
 
-      // Stage 정보 업데이트
-      stage.name = dto.name;
-      stage.type = dto.type;
-      stage.options = stageOptions;
+      if (dto.type === StageType.TOURNAMENT) {
+        // 토너먼트 타입일 경우 특별한 삭제 로직 사용 (외래 키 제약 조건 문제 해결)
+        console.log(`토너먼트 스테이지 ID ${stage.id} 업데이트를 위한 특별 삭제 로직 실행`);
+        await this.tournamentStageStrategy.deleteStage(stage.id);
+        
+        // 새로운 Stage 생성 (deleteStage에서 원본을 삭제했으므로 새로 생성)
+        stage = this.stageRepository.create({
+          league,
+          name: dto.name,
+          order: dto.order,
+          type: dto.type,
+          options: stageOptions,
+        });
+      } else {
+        // 일반 그룹 스테이지일 경우 기존 로직 사용
+        if (stage.groups?.length > 0) {
+          await this.groupRepository.remove(stage.groups);
+        }
+        if (stage.matches?.length > 0) {
+          await this.matchRepository.remove(stage.matches);
+        }
+        
+        // Stage 정보 업데이트
+        stage.name = dto.name;
+        stage.type = dto.type;
+        stage.options = stageOptions;
+      }
     } else {
       // 새로운 Stage 생성
       stage = this.stageRepository.create({
@@ -171,7 +227,7 @@ export class StagesService {
     stage = await this.stageRepository.save(stage);
 
     // groups 데이터가 있는 경우 처리
-    if (dto.groups && dto.groups.length > 0) {
+    if (dto.groups && dto.groups.length > 0 && dto.type === StageType.GROUP) {
       const groups = await Promise.all(
         dto.groups.map(async (groupDto, index) => {
           // 각 참가자의 userId로 LeagueParticipant 찾기
@@ -298,7 +354,10 @@ export class StagesService {
 
       stage.groups = groups;
     }
-
+    if(dto.type === StageType.TOURNAMENT){
+      await this.tournamentStageStrategy.createMatches(stage);
+      await this.tournamentStageStrategy.assignSeeds(stage);
+    }
     // 예선 스테이지인 경우 리그 상태 업데이트
     if (dto.type === StageType.GROUP) {
       league.status = LeagueStatus.PRELIMINARY;
@@ -443,7 +502,7 @@ export class StagesService {
         // 먼저 매치 조회 (트랜잭션 밖에서)
         const match = await this.matchRepository.findOne({
           where: { id: matchId },
-          relations: ['stage', 'group', 'player1', 'player2', 'result'],
+          relations: ['stage', 'group', 'player1', 'player2', 'result', 'nextMatch'],
         });
       
         if (!match) {

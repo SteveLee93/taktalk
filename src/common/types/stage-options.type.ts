@@ -5,7 +5,6 @@ export interface MatchFormatOptions {
   setsRequired: number;
 }
 
-export type BracketType = 'SINGLE_ELIMINATION' | 'DOUBLE_ELIMINATION';
 export type SeedingType = 'GROUP_RANK' | 'MANUAL';
 
 export interface BaseStageOptions {
@@ -27,7 +26,6 @@ export interface GroupStageOptions extends BaseStageOptions {
 }
 
 export interface TournamentOptions extends BaseStageOptions {
-  bracketType: BracketType;
   seeding: {
     type: SeedingType;
     qualificationCriteria?: {

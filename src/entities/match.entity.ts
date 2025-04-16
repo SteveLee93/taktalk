@@ -10,7 +10,8 @@ export enum MatchStatus {
   IN_PROGRESS = 'in_progress',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
-  BYE = 'bye'
+  BYE = 'bye',
+  WAITING = 'waiting'
 }
 
 export interface PlayerOrigin {
@@ -39,12 +40,12 @@ export class Match {
   @ApiProperty({ description: '플레이어 1', type: () => LeagueParticipant })
   @ManyToOne(() => LeagueParticipant, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'player1_id' })
-  player1: LeagueParticipant;
+  player1?: LeagueParticipant;
 
   @ApiProperty({ description: '플레이어 2', type: () => LeagueParticipant })
   @ManyToOne(() => LeagueParticipant, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'player2_id' })
-  player2: LeagueParticipant;
+  player2?: LeagueParticipant;
 
   @ApiProperty({ description: '플레이어 1 출신 정보 (예선 조/순위/시드)' })
   @Column('json', { nullable: true })

@@ -220,8 +220,8 @@ export class GroupStageStrategy implements StageStrategy {
       // 경기 결과로 통계 계산
       for (const match of group.matches) {
         if (match.result) {
-          const player1Id = match.player1.id;
-          const player2Id = match.player2.id;
+          const player1Id = match.player1?.id;
+          const player2Id = match.player2?.id;
           const winnerId = match.result.winner.id;
           const sets = match.result.scoreDetails.sets;
 
@@ -240,15 +240,21 @@ export class GroupStageStrategy implements StageStrategy {
             winnerStats.wins++;
             winnerStats.setsWon += winnerId === player1Id ? player1Sets : player2Sets;
             winnerStats.setsLost += winnerId === player1Id ? player2Sets : player1Sets;
-            winnerStats.headToHead.set(
-              winnerId === player1Id ? player2Id : player1Id,
-              true
-            );
+             // headToHead.set 오류 해결
+            if (player1Id !== undefined && player2Id !== undefined) {
+              winnerStats.headToHead.set(
+                winnerId === player1Id ? player2Id : player1Id,
+                true
+              );
+            }
           }
+         
 
           // 패자의 세트 기록 업데이트
-          const loserId = winnerId === player1Id ? player2Id : player1Id;
-          const loserStats = playerStats.get(loserId);
+          const loserId = player1Id !== undefined && player2Id !== undefined 
+            ? (winnerId === player1Id ? player2Id : player1Id) 
+            : undefined;
+          const loserStats = loserId !== undefined ? playerStats.get(loserId) : undefined;
           if (loserStats) {
             loserStats.setsWon += winnerId === player1Id ? player2Sets : player1Sets;
             loserStats.setsLost += winnerId === player1Id ? player1Sets : player2Sets;

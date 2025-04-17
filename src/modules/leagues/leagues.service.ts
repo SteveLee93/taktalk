@@ -38,7 +38,7 @@ export class LeaguesService {
     const league = this.leagueRepository.create({
       ...createLeagueDto,
       creator: user,
-      status: LeagueStatus.ORGANIZING,
+      status: LeagueStatus.RECRUITING,
     });
     
     const savedLeague = await this.leagueRepository.save(league);

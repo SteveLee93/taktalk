@@ -102,7 +102,7 @@ export class LeaguesController {
     @Request() req
   ): Promise<LeagueTemplateDto> {
     // 요청 본문의 userId가 있으면 사용, 없으면 쿼리 파라미터, 없으면 현재 로그인한 사용자 ID 사용
-    const userId = createTemplateDto.userId || (queryUserId ? parseInt(queryUserId) : req.user.id);
+    const userId = createTemplateDto.userId || (queryUserId && !isNaN(parseInt(queryUserId)) ? parseInt(queryUserId) : req.user.id);
     console.log('템플릿 저장 요청:', { templateName: createTemplateDto.name, userId });
     return this.leaguesService.createTemplate(createTemplateDto, userId);
   }

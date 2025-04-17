@@ -43,45 +43,6 @@ export class LeaguesService {
     
     const savedLeague = await this.leagueRepository.save(league);
 
-    // 기본 스테이지 생성 (예선 스테이지)
-    await this.stagesService.createStage({
-      leagueId: savedLeague.id,
-      name: '예선',
-      order: 1,
-      type: StageType.GROUP,
-      options: {
-        matchFormat: {
-          gamesRequired: 5,
-          setsRequired: 3
-        },
-        groupCount: 4,
-        playersPerGroup: 4,
-        advancingPlayersCount: 2
-      },
-      groups: []
-    });
-
-    // 본선 스테이지 생성
-    await this.stagesService.createStage({
-      leagueId: savedLeague.id,
-      name: '본선',
-      order: 2,
-      type: StageType.TOURNAMENT,
-      options: {
-        matchFormat: {
-          gamesRequired: 5,
-          setsRequired: 3
-        },
-        seeding: {
-          type: 'GROUP_RANK',
-          qualificationCriteria: {
-            rankCutoff: 2
-          }
-        }
-      },
-      groups: []
-    });
-
     return this.getLeague(savedLeague.id);
   }
 

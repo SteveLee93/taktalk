@@ -1,5 +1,5 @@
 export enum SkillLevel {
-  S = 's',
+  S = 'S',
   ZERO = '0',
   ONE = '1',
   TWO = '2',

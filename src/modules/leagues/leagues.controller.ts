@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Patch } from '@nestjs/common';
+import { Controller, Post, Body, Param, UseGuards, Request, Put, Get, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Patch, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { LeaguesService } from './leagues.service';
@@ -89,7 +89,11 @@ export class LeaguesController {
   async getTemplates(
     @Query('userId') userId: string
   ): Promise<LeagueTemplateDto[]> {
-    return this.leaguesService.findTemplatesByUserId(parseInt(userId));
+    const parsedUserId = parseInt(userId);
+    if (isNaN(parsedUserId)) {
+      throw new BadRequestException('유효한 사용자 ID를 제공해야 합니다.');
+    }
+    return this.leaguesService.findTemplatesByUserId(parsedUserId);
   }
 
   @Post('templates')
@@ -115,7 +119,14 @@ export class LeaguesController {
     @Param('id') id: string,
     @Query('userId') userId: string
   ): Promise<void> {
-    return this.leaguesService.deleteTemplate(parseInt(id), parseInt(userId));
+    const parsedId = parseInt(id);
+    const parsedUserId = parseInt(userId);
+    
+    if (isNaN(parsedId) || isNaN(parsedUserId)) {
+      throw new BadRequestException('유효한 ID 값을 제공해야 합니다.');
+    }
+    
+    return this.leaguesService.deleteTemplate(parsedId, parsedUserId);
   }
 
   @Get(':id')

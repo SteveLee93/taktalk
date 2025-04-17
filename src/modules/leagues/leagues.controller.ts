@@ -84,12 +84,11 @@ export class LeaguesController {
   // 템플릿 관련 API
   @Get('templates')
   @ApiOperation({ summary: '템플릿 목록 조회' })
-  @ApiQuery({ name: 'userId', required: true, description: '조회할 사용자 ID' })
   @UseGuards(JwtAuthGuard)
   async getTemplates(
-    @Query('userId') userId: string
+    @Request() req,
   ): Promise<LeagueTemplateDto[]> {
-    const parsedUserId = parseInt(userId);
+    const parsedUserId = parseInt(req.user.id);
     if (isNaN(parsedUserId)) {
       throw new BadRequestException('유효한 사용자 ID를 제공해야 합니다.');
     }
@@ -98,35 +97,30 @@ export class LeaguesController {
 
   @Post('templates')
   @ApiOperation({ summary: '템플릿 저장' })
-  @ApiQuery({ name: 'userId', required: false, description: '템플릿을 저장할 사용자 ID (쿼리 파라미터)' })
+  @ApiResponse({
+    status: 201,
+    description: '저장된 템플릿을 반환',
+    type: LeagueTemplateDto,
+  })
   @UseGuards(JwtAuthGuard)
   async createTemplate(
-    @Body() createTemplateDto: CreateLeagueTemplateDto,
-    @Query('userId') queryUserId: string,
-    @Request() req
+    @Body() dto: CreateLeagueTemplateDto,
+    @Request() req,
   ): Promise<LeagueTemplateDto> {
-    // 요청 본문의 userId가 있으면 사용, 없으면 쿼리 파라미터, 없으면 현재 로그인한 사용자 ID 사용
-    const userId = createTemplateDto.userId || (queryUserId && !isNaN(parseInt(queryUserId)) ? parseInt(queryUserId) : req.user.id);
-    console.log('템플릿 저장 요청:', { templateName: createTemplateDto.name, userId });
-    return this.leaguesService.createTemplate(createTemplateDto, userId);
+    // DTO에 userId 가 있으면 그걸 쓰고, 없으면 로그인한 사용자 ID 사용
+    const userId = dto.userId ?? req.user.id;
+    return this.leaguesService.createTemplate(dto, userId);
   }
 
   @Delete('templates/:id')
   @ApiOperation({ summary: '템플릿 삭제' })
-  @ApiQuery({ name: 'userId', required: true, description: '템플릿 소유자 ID' })
+  @ApiResponse({ status: 200, description: '삭제 성공' })
   @UseGuards(JwtAuthGuard)
   async deleteTemplate(
-    @Param('id') id: string,
-    @Query('userId') userId: string
+    @Param('id') id: number,
+    @Request() req,
   ): Promise<void> {
-    const parsedId = parseInt(id);
-    const parsedUserId = parseInt(userId);
-    
-    if (isNaN(parsedId) || isNaN(parsedUserId)) {
-      throw new BadRequestException('유효한 ID 값을 제공해야 합니다.');
-    }
-    
-    return this.leaguesService.deleteTemplate(parsedId, parsedUserId);
+    return this.leaguesService.deleteTemplate(id, req.user.id);
   }
 
   @Get(':id')

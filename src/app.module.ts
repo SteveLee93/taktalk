@@ -14,7 +14,7 @@ import { PlayerInGroup } from './entities/player-in-group.entity';
 import { Match } from './entities/match.entity';
 import { MatchResult } from './entities/match-result.entity';
 import { LeagueTemplate } from './entities/league-template.entity';
-
+import { NoticesModule } from './modules/notices/notices.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -48,6 +48,7 @@ import { LeagueTemplate } from './entities/league-template.entity';
     AuthModule,
     LeaguesModule,
     StagesModule,
+    NoticesModule,
   ],
 })
 export class AppModule {} 

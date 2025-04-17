@@ -6,6 +6,11 @@ import { PlayerInGroup } from './player-in-group.entity';
 import { MatchResult } from './match-result.entity';
 import { Exclude, Expose } from 'class-transformer';
 
+export enum UserRole {
+  ADMIN = 'admin',
+  USER = 'user'
+}
+
 @Entity()
 export class User {
   @ApiProperty({ description: '사용자 ID' })
@@ -37,6 +42,11 @@ export class User {
   @Column({ nullable: true })
   @Expose()
   phone: string;
+
+  @ApiProperty({ description: '사용자 역할', enum: UserRole, default: UserRole.USER })
+  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  @Expose()
+  role: UserRole;
 
   @OneToMany(() => LeagueOperator, operator => operator.user)
   operatingLeagues: LeagueOperator[];
